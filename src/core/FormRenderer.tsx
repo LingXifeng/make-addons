@@ -149,6 +149,14 @@ function renderControl(
         />
       );
 
+    case 'potionEffects':
+      return (
+        <PotionEffectsInput
+          value={value || []}
+          onChange={v => onChange(field.key, v)}
+        />
+      );
+
     default:
       return <span>不支持的字段类型: {field.type}</span>;
   }
@@ -323,6 +331,82 @@ function RepairItemsInput({ value, onChange }: { value: any[]; onChange: (v: any
       ))}
       <button onClick={() => onChange([...value, { items: ['minecraft:diamond'], repairAmount: 'q.max_durability * 0.25' }])}>
         + 添加修复材料
+      </button>
+    </div>
+  );
+}
+
+// ===== 药水效果列表输入 =====
+
+const POTION_EFFECTS = [
+  'speed', 'slowness', 'haste', 'mining_fatigue',
+  'strength', 'instant_health', 'instant_damage',
+  'jump_boost', 'nausea', 'regeneration', 'resistance',
+  'fire_resistance', 'water_breathing', 'invisibility',
+  'blindness', 'night_vision', 'hunger', 'weakness',
+  'poison', 'wither', 'health_boost', 'absorption',
+  'saturation', 'levitation', 'fatal_poison', 'conduit_power',
+  'slow_falling', 'bad_omen', 'hero_of_the_village',
+];
+
+function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: any[]) => void }) {
+  return (
+    <div className="potion-effects-input">
+      {value.map((effect, i) => (
+        <div key={i} className="potion-effect-row">
+          <select
+            value={effect.effect || 'speed'}
+            onChange={e => {
+              const newValue = [...value];
+              newValue[i] = { ...effect, effect: e.target.value };
+              onChange(newValue);
+            }}
+          >
+            {POTION_EFFECTS.map(ef => (
+              <option key={ef} value={ef}>{ef}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={effect.amplifier ?? 0}
+            min={0}
+            max={255}
+            placeholder="等级"
+            onChange={e => {
+              const newValue = [...value];
+              newValue[i] = { ...effect, amplifier: parseInt(e.target.value) || 0 };
+              onChange(newValue);
+            }}
+          />
+          <input
+            type="number"
+            value={effect.duration ?? 10}
+            min={0}
+            step={0.1}
+            placeholder="持续时间(秒)"
+            onChange={e => {
+              const newValue = [...value];
+              newValue[i] = { ...effect, duration: parseFloat(e.target.value) || 0 };
+              onChange(newValue);
+            }}
+          />
+          <label className="potion-effect-visible">
+            <input
+              type="checkbox"
+              checked={effect.visible !== false}
+              onChange={e => {
+                const newValue = [...value];
+                newValue[i] = { ...effect, visible: e.target.checked };
+                onChange(newValue);
+              }}
+            />
+            显示粒子
+          </label>
+          <button onClick={() => onChange(value.filter((_, j) => j !== i))}>删除</button>
+        </div>
+      ))}
+      <button onClick={() => onChange([...value, { effect: 'speed', amplifier: 0, duration: 10, visible: true }])}>
+        + 添加药水效果
       </button>
     </div>
   );

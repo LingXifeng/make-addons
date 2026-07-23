@@ -147,6 +147,138 @@ export async function generateItemJson(
       continue;
     }
 
+    // === 高级属性特殊处理 ===
+
+    // 药水效果
+    if (field.key === 'potionEffects' && data.potionEffectsEnable) {
+      if (Array.isArray(value) && value.length > 0) {
+        components['minecraft:food'] = components['minecraft:food'] || {};
+        components['minecraft:food'].on_consume = {
+          apply_effects_to_player: value.map((e: any) => ({
+            effect: e.effect,
+            amplifier: e.amplifier ?? 0,
+            duration: e.duration ?? 10,
+            visible: e.visible !== false,
+          })),
+        };
+      }
+      continue;
+    }
+
+    // 使用行为 (on_use 事件)
+    if (field.key === 'onUseEvent' && data.onUseEnable) {
+      components['minecraft:on_use'] = {
+        on_use: { event: value || 'on_use_event' },
+      };
+      continue;
+    }
+
+    // 使用函数
+    if (field.key === 'onUseFunc' && value) {
+      if (!components['minecraft:on_use']) {
+        components['minecraft:on_use'] = { on_use: {} };
+      }
+      components['minecraft:on_use'].on_use.function = value;
+      continue;
+    }
+
+    // 方块放置器
+    if (field.key === 'blockPlacerBlock' && data.blockPlacerEnable) {
+      components['minecraft:block_placer'] = {
+        block_reference: value || 'minecraft:stone',
+      };
+      continue;
+    }
+
+    // 实体放置器
+    if (field.key === 'entityPlacerEntity' && data.entityPlacerEnable) {
+      components['minecraft:entity_placer'] = {
+        entity_reference: value || 'minecraft:zombie',
+      };
+      continue;
+    }
+
+    // 武器命中事件
+    if (field.key === 'onHurtEntityEvent' && data.weaponHitEventEnable) {
+      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
+      components['minecraft:weapon'].on_hurt_entity = { event: value || 'on_hurt_entity_event' };
+      continue;
+    }
+    if (field.key === 'onNotHurtEntityEvent' && data.weaponHitEventEnable) {
+      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
+      components['minecraft:weapon'].on_not_hurt_entity = { event: value || 'on_not_hurt_entity_event' };
+      continue;
+    }
+    if (field.key === 'onHitBlockEvent' && data.weaponHitEventEnable) {
+      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
+      components['minecraft:weapon'].on_hit_block = { event: value || 'on_hit_block_event' };
+      continue;
+    }
+
+    // 使用修饰符
+    if (field.key === 'useDuration' && data.useModifiersEnable) {
+      components['minecraft:use_duration'] = value;
+      continue;
+    }
+    if (field.key === 'movementModifier' && data.useModifiersEnable) {
+      components['minecraft:use_modifiers'] = {
+        movement_modifier: value,
+      };
+      continue;
+    }
+
+    // 射击者
+    if (field.key === 'shooterAmmunition' && data.shooterEnable) {
+      components['minecraft:shooter'] = {
+        ammunition: [{ item: value || 'minecraft:arrow' }],
+        max_draw_duration: data.shooterMaxDrawDuration ?? 1.5,
+        scale_power_by_draw_duration: data.shooterScalePower !== false,
+      };
+      continue;
+    }
+    if (field.key === 'shooterMaxDrawDuration' && data.shooterEnable) {
+      // 已在 shooterAmmunition 中处理
+      continue;
+    }
+    if (field.key === 'shooterScalePower' && data.shooterEnable) {
+      // 已在 shooterAmmunition 中处理
+      continue;
+    }
+
+    // 耐火
+    if (field.key === 'fireResistant' && value === true) {
+      components['minecraft:fire_resistant'] = {};
+      continue;
+    }
+
+    // 稀有度
+    if (field.key === 'rarity' && value) {
+      components['minecraft:rarity'] = value;
+      continue;
+    }
+
+    // 穿透武器 / 动能武器（需脚本支持，添加 item tag）
+    if (field.key === 'piercingWeaponEnable' && value === true) {
+      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
+      // 标记为穿透武器，脚本可读取此 tag
+      const tags = itemDef.description?.tags || [];
+      if (!tags.includes('pa:piercing_weapon')) {
+        tags.push('pa:piercing_weapon');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags);
+      continue;
+    }
+    if (field.key === 'kineticWeaponEnable' && value === true) {
+      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
+      // 标记为动能武器，脚本可读取此 tag
+      const tags = itemDef.description?.tags || [];
+      if (!tags.includes('pa:kinetic_weapon')) {
+        tags.push('pa:kinetic_weapon');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags);
+      continue;
+    }
+
     // 普通字段直接设置
     setByPath(result, field.jsonPath, value);
   }

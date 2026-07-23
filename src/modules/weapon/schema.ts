@@ -83,6 +83,62 @@ export const weaponFields: FieldSchema[] = [
   // --- 方块交互 ---
   { key: 'canDestroy', label: '可破坏方块', type: 'blockList', defaultValue: [], section: '方块交互' },
   { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', defaultValue: false, section: '方块交互', showWhen: { field: 'canDestroy', value: 'nonempty' } },
+
+  // --- 高级属性 ---
+
+  // 药水效果
+  { key: 'potionEffectsEnable', label: '药水效果', type: 'boolean', defaultValue: false, section: '高级属性', hint: '使用物品时给予药水效果' },
+  { key: 'potionEffects', label: '效果列表', type: 'potionEffects', defaultValue: [], section: '高级属性', showWhen: { field: 'potionEffectsEnable', value: true } },
+
+  // 使用行为 (on_use 事件)
+  { key: 'onUseEnable', label: '使用行为', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品使用时触发事件' },
+  { key: 'onUseEvent', label: '使用事件名称', type: 'text', defaultValue: 'on_use_event', section: '高级属性', showWhen: { field: 'onUseEnable', value: true } },
+
+  // 使用函数
+  { key: 'onUseFunc', label: '使用函数', type: 'text', defaultValue: '', section: '高级属性', hint: '物品使用时调用的函数路径，如 scripts/my_func' },
+
+  // 方块放置器
+  { key: 'blockPlacerEnable', label: '方块放置器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '使用物品时放置方块' },
+  { key: 'blockPlacerBlock', label: '放置的方块', type: 'text', defaultValue: 'minecraft:stone', section: '高级属性', showWhen: { field: 'blockPlacerEnable', value: true } },
+
+  // 实体放置器
+  { key: 'entityPlacerEnable', label: '实体放置器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '使用物品时生成实体' },
+  { key: 'entityPlacerEntity', label: '生成的实体', type: 'text', defaultValue: 'minecraft:zombie', section: '高级属性', showWhen: { field: 'entityPlacerEnable', value: true } },
+
+  // 武器命中事件
+  { key: 'weaponHitEventEnable', label: '武器命中事件', type: 'boolean', defaultValue: false, section: '高级属性', hint: '攻击实体/方块时触发事件' },
+  { key: 'onHurtEntityEvent', label: '命中实体事件', type: 'text', defaultValue: 'on_hurt_entity_event', section: '高级属性', showWhen: { field: 'weaponHitEventEnable', value: true } },
+  { key: 'onNotHurtEntityEvent', label: '未命中事件', type: 'text', defaultValue: 'on_not_hurt_entity_event', section: '高级属性', showWhen: { field: 'weaponHitEventEnable', value: true } },
+  { key: 'onHitBlockEvent', label: '命中方块事件', type: 'text', defaultValue: 'on_hit_block_event', section: '高级属性', showWhen: { field: 'weaponHitEventEnable', value: true } },
+
+  // 使用修饰符
+  { key: 'useModifiersEnable', label: '使用修饰符', type: 'boolean', defaultValue: false, section: '高级属性', hint: '控制使用时间和移动速度' },
+  { key: 'useDuration', label: '使用持续时间', type: 'number', defaultValue: 9999, min: 0, max: 99999, step: 0.1, section: '高级属性', showWhen: { field: 'useModifiersEnable', value: true }, hint: '物品使用的持续时间（秒）' },
+  { key: 'movementModifier', label: '移动速度修饰符', type: 'number', defaultValue: 0.4, min: 0, max: 1, step: 0.1, section: '高级属性', showWhen: { field: 'useModifiersEnable', value: true }, hint: '使用时移动速度倍率（0=无法移动，1=正常速度）' },
+
+  // 射击者 (弓/弩射击)
+  { key: 'shooterEnable', label: '射击者', type: 'boolean', defaultValue: false, section: '高级属性', hint: '启用射击机制（弓/弩）' },
+  { key: 'shooterAmmunition', label: '弹药类型', type: 'text', defaultValue: 'minecraft:arrow', section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+  { key: 'shooterMaxDrawDuration', label: '最大拉弓时间', type: 'number', defaultValue: 1.5, min: 0.1, max: 10, step: 0.1, section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+  { key: 'shooterScalePower', label: '按拉弓时间缩放威力', type: 'boolean', defaultValue: true, section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+
+  // 耐火
+  { key: 'fireResistant', label: '耐火', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品在火焰和岩浆中不会被销毁' },
+
+  // 稀有度
+  { key: 'rarity', label: '稀有度', type: 'select', defaultValue: '', section: '高级属性', options: [
+    { label: '无', value: '' },
+    { label: '普通', value: 'common' },
+    { label: '少见', value: 'uncommon' },
+    { label: '稀有', value: 'rare' },
+    { label: '史诗', value: 'epic' },
+  ]},
+
+  // 穿透武器
+  { key: 'piercingWeaponEnable', label: '穿透武器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '攻击穿透盔甲造成伤害（需脚本支持）' },
+
+  // 动能武器
+  { key: 'kineticWeaponEnable', label: '动能武器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '下落攻击增加伤害（需脚本支持）' },
 ];
 
 // ===== 武器模块定义 =====
