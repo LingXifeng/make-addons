@@ -50,10 +50,10 @@ export const weaponFields: FieldSchema[] = [
     { label: '无', value: '' }, { label: '普通', value: 'common' }, { label: '罕见', value: 'uncommon' }, { label: '稀有', value: 'rare' }, { label: '史诗', value: 'epic' },
   ]},
   { key: 'hoverText', label: '悬停文本', type: 'text', defaultValue: '', section: '通用属性', jsonPath: 'components.minecraft:hover_text.value', hint: '鼠标悬停时显示的附加文本' },
-  { key: 'liquidClipped', label: '液体裁剪', type: 'boolean', section: '通用属性', jsonPath: 'components.minecraft:liquid_clipped', hint: '物品在液体中是否可使用' },
-  { key: 'despawn', label: '消失', type: 'boolean', section: '通用属性', jsonPath: 'components.minecraft:despawn', hint: '掉落后是否会消失' },
-  { key: 'shouldDespawnToChat', label: '消失到聊天', type: 'boolean', section: '通用属性', jsonPath: 'components.minecraft:should_despawn_to_chat' },
-  { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', section: '通用属性', jsonPath: 'components.minecraft:can_destroy_in_creative' },
+  { key: 'liquidClipped', label: '液体裁剪', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:liquid_clipped', hint: '物品在液体中是否可使用' },
+  { key: 'despawn', label: '消失', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:despawn', hint: '掉落后是否会消失' },
+  { key: 'shouldDespawnToChat', label: '消失到聊天', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:should_despawn_to_chat' },
+  { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:can_destroy_in_creative' },
 
   // --- 交互属性 ---
   { key: 'repairableEnable', label: '启用可修复', type: 'boolean', defaultValue: false, section: '交互属性' },
@@ -67,7 +67,7 @@ export const weaponFields: FieldSchema[] = [
   { key: 'cooldownType', label: '冷却类型', type: 'select', defaultValue: 'attack', section: '交互属性', showWhen: { field: 'cooldownEnable', value: true }, options: [
     { label: '攻击', value: 'attack' }, { label: '使用', value: 'use' },
   ]},
-  { key: 'allowOffHand', label: '允许副手', type: 'boolean', section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
+  { key: 'allowOffHand', label: '允许副手', type: 'boolean', defaultValue: false, section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
   { key: 'fuelEnable', label: '燃料', type: 'boolean', defaultValue: false, section: '交互属性', hint: '物品可作为熔炉燃料' },
   { key: 'fuelDuration', label: '燃烧时间(秒)', type: 'number', defaultValue: 10, min: 0, max: 9999, step: 1, section: '交互属性', showWhen: { field: 'fuelEnable', value: true } },
   { key: 'throwableEnable', label: '可投掷', type: 'boolean', defaultValue: false, section: '交互属性' },
