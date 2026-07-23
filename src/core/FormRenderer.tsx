@@ -268,7 +268,7 @@ function IconPicker({ value, onChange, iconDir, onTextureUpload, customTexture }
         {customTexture ? (
           <img src={customTexture.dataUrl} alt="custom" />
         ) : value ? (
-          <img src={`/assets/icons/${iconDir}/${value}.png`} alt={value} onError={(e) => {
+          <img src={`${import.meta.env.BASE_URL}assets/icons/${iconDir}/${value}.png`} alt={value} onError={(e) => {
             (e.target as HTMLImageElement).style.opacity = '0.3';
           }} />
         ) : null}
@@ -314,7 +314,7 @@ function IconPicker({ value, onChange, iconDir, onTextureUpload, customTexture }
                   setShowPicker(false);
                 }}
               >
-                <img src={`/assets/icons/${icon.path}.png`} alt={icon.name} loading="lazy" />
+                <img src={`${import.meta.env.BASE_URL}assets/icons/${icon.path}.png`} alt={icon.name} loading="lazy" />
                 <span>{icon.name}</span>
               </div>
             ))}

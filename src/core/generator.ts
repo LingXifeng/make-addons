@@ -163,49 +163,115 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     };
   }
 
-  // 使用事件
-  if (data.onUseEnable && data.onUseEvent) {
-    result['minecraft:item'].events = result['minecraft:item'].events || {};
-    result['minecraft:item'].events[data.onUseEvent] = {};
-    components['minecraft:on_use'] = { trigger: data.onUseEvent };
+  // 使用函数
+  if (data.useFunctionEnable && data.useFunctionValue) {
+    components['minecraft:on_use'] = { trigger: data.useFunctionValue };
   }
 
   // 方块放置器
   if (data.blockPlacerEnable && data.blockPlacerBlock) {
-    components['minecraft:block_placer'] = { block_reference: data.blockPlacerBlock };
+    const bp: Record<string, any> = { block_reference: data.blockPlacerBlock };
+    if (data.blockPlacerUseOn?.length > 0) {
+      bp.use_on = data.blockPlacerUseOn;
+    }
+    components['minecraft:block_placer'] = bp;
+    // 冷却 + 类型
+    if (data.blockPlacerCooldown && data.blockPlacerCooldown > 0) {
+      components['minecraft:cooldown'] = {
+        category: data.blockPlacerType || 'use',
+        duration: data.blockPlacerCooldown,
+      };
+    }
   }
 
   // 实体放置器
   if (data.entityPlacerEnable && data.entityPlacerEntity) {
-    components['minecraft:entity_placer'] = { entity: data.entityPlacerEntity };
+    const ep: Record<string, any> = { entity: data.entityPlacerEntity };
+    if (data.entityPlacerDispenseOn?.length > 0) {
+      ep.dispense_on = data.entityPlacerDispenseOn;
+    }
+    if (data.entityPlacerUseOn?.length > 0) {
+      ep.use_on = data.entityPlacerUseOn;
+    }
+    components['minecraft:entity_placer'] = ep;
   }
 
-  // 武器命中事件
-  if (data.weaponHitEventEnable) {
-    result['minecraft:item'].events = result['minecraft:item'].events || {};
-    if (data.onHurtEntityEvent) {
-      result['minecraft:item'].events[data.onHurtEntityEvent] = {};
+  // 武器命中
+  if (data.weaponHitEnable) {
+    const weapon: Record<string, any> = {};
+    // 伤害实体时
+    const hurtEntityResp: Record<string, any> = {};
+    if (data.hitEntityRandomize) hurtEntityResp.randomize = true;
+    if (data.hitEntityFunction) hurtEntityResp.function = data.hitEntityFunction;
+    if (data.hitEntityTarget) hurtEntityResp.target = data.hitEntityTarget;
+    if (Object.keys(hurtEntityResp).length > 0) {
+      weapon.on_hurt_entity = hurtEntityResp;
     }
-    if (data.onNotHurtEntityEvent) {
-      result['minecraft:item'].events[data.onNotHurtEntityEvent] = {};
+    // 击中方块时
+    const hitBlockResp: Record<string, any> = {};
+    if (data.hitBlockRandomize) hitBlockResp.randomize = true;
+    if (data.hitBlockFunction) hitBlockResp.function = data.hitBlockFunction;
+    if (data.hitBlockTarget) hitBlockResp.target = data.hitBlockTarget;
+    if (Object.keys(hitBlockResp).length > 0) {
+      weapon.on_hit_block = hitBlockResp;
     }
-    if (data.onHitBlockEvent) {
-      result['minecraft:item'].events[data.onHitBlockEvent] = {};
+    if (Object.keys(weapon).length > 0) {
+      components['minecraft:weapon'] = weapon;
     }
-    components['minecraft:weapon'] = {
-      on_hurt_entity: data.onHurtEntityEvent,
-      on_not_hurt_entity: data.onNotHurtEntityEvent,
-      on_hit_block: data.onHitBlockEvent,
+  }
+
+  // 动能武器
+  if (data.kineticWeaponEnable) {
+    components['minecraft:kinetic_weapon'] = {
+      delay: data.kineticDelay ?? 13,
+      reach: { min: data.kineticReachMin ?? 2, max: data.kineticReachMax ?? 4.5 },
+      creative_reach: { min: data.kineticCreativeReachMin ?? 2, max: data.kineticCreativeReachMax ?? 7.5 },
+      hitbox_margin: data.kineticHitboxMargin ?? 0.25,
+      damage_multiplier: data.kineticDamageMultiplier ?? 0.82,
+      damage_conditions: {
+        max_duration: data.kineticDamageMaxDuration ?? 250,
+        min_relative_speed: data.kineticDamageMinRelSpeed ?? 4.6,
+      },
+      knockback_conditions: {
+        max_duration: data.kineticKnockbackMaxDuration ?? 100,
+        min_speed: data.kineticKnockbackMinSpeed ?? 5.1,
+      },
+      dismount_conditions: {
+        max_duration: data.kineticDismountMaxDuration ?? 80,
+        min_speed: data.kineticDismountMinSpeed ?? 12,
+      },
     };
+  }
+
+  // 穿刺武器
+  if (data.piercingWeaponEnable) {
+    components['minecraft:piercing_weapon'] = {
+      reach: { min: data.piercingReachMin ?? 2, max: data.piercingReachMax ?? 4.5 },
+      creative_reach: { min: data.piercingCreativeReachMin ?? 2, max: data.piercingCreativeReachMax ?? 7.5 },
+      hitbox_margin: data.piercingHitboxMargin ?? 0.25,
+    };
+  }
+
+  // 使用修饰符
+  if (data.useModifiersEnable) {
+    const um: Record<string, any> = {};
+    if (data.useModifiersDuration !== undefined) um.use_duration = data.useModifiersDuration;
+    um.emit_vibrations = data.useModifiersEmitVibration === true;
+    if (data.useModifiersMovement !== undefined) um.movement_modifier = data.useModifiersMovement;
+    components['minecraft:use_modifiers'] = um;
   }
 
   // 射击者
   if (data.shooterEnable) {
-    components['minecraft:shooter'] = {
-      ammunition: [{ item: data.shooterAmmunition || 'minecraft:arrow', use_offhand: true, quantity: 1 }],
+    const shooter: Record<string, any> = {
+      ammunition: [{ item: data.shooterAmmunition || 'minecraft:arrow', use_offhand: true, search_inventory: true, use_in_creative: true }],
       max_draw_duration: data.shooterMaxDrawDuration || 1.5,
       scale_power_by_draw_duration: data.shooterScalePower !== false,
     };
+    if (data.shooterChargeOnDraw) {
+      shooter.charge_on_draw = true;
+    }
+    components['minecraft:shooter'] = shooter;
   }
 
   // 耐火

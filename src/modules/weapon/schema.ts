@@ -70,20 +70,78 @@ export const weaponFields: FieldSchema[] = [
   // --- 高级属性 ---
   { key: 'potionEffectsEnable', label: '药水效果', type: 'boolean', defaultValue: false, section: '高级属性', hint: '手持或穿戴时持续生效' },
   { key: 'potionEffects', label: '效果列表', type: 'potionEffects', defaultValue: [], section: '高级属性', showWhen: { field: 'potionEffectsEnable', value: true } },
-  { key: 'onUseEnable', label: '使用行为', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品使用时触发事件' },
-  { key: 'onUseEvent', label: '使用事件名称', type: 'text', defaultValue: 'on_use_event', section: '高级属性', showWhen: { field: 'onUseEnable', value: true } },
+
+  // 使用函数
+  { key: 'useFunctionEnable', label: '使用函数', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品使用时执行函数/Molang' },
+  { key: 'useFunctionValue', label: '函数内容', type: 'text', defaultValue: '', section: '高级属性', showWhen: { field: 'useFunctionEnable', value: true }, hint: '如 query.is_first_item' },
+
+  // 方块放置器
   { key: 'blockPlacerEnable', label: '方块放置器', type: 'boolean', defaultValue: false, section: '高级属性' },
   { key: 'blockPlacerBlock', label: '放置的方块', type: 'text', defaultValue: 'minecraft:stone', section: '高级属性', showWhen: { field: 'blockPlacerEnable', value: true } },
+  { key: 'blockPlacerUseOn', label: '可作用于', type: 'blockList', defaultValue: [], section: '高级属性', showWhen: { field: 'blockPlacerEnable', value: true }, hint: '只能在这些方块上放置' },
+  { key: 'blockPlacerCooldown', label: '冷却时间(秒)', type: 'number', defaultValue: 0, min: 0, max: 100, step: 0.1, section: '高级属性', showWhen: { field: 'blockPlacerEnable', value: true } },
+  { key: 'blockPlacerType', label: '触发类型', type: 'select', defaultValue: 'use', section: '高级属性', showWhen: { field: 'blockPlacerEnable', value: true }, options: [
+    { label: '使用(右键)', value: 'use' }, { label: '攻击(左键)', value: 'attack' },
+  ]},
+
+  // 武器命中
+  { key: 'weaponHitEnable', label: '武器命中', type: 'boolean', defaultValue: false, section: '高级属性', hint: '命中实体/方块时触发事件' },
+  // 伤害实体时
+  { key: 'hitEntityRandomize', label: '伤害实体-随机化', type: 'boolean', defaultValue: false, section: '高级属性', showWhen: { field: 'weaponHitEnable', value: true } },
+  { key: 'hitEntityFunction', label: '伤害实体-函数', type: 'text', defaultValue: '', section: '高级属性', showWhen: { field: 'weaponHitEnable', value: true }, hint: 'Molang 表达式' },
+  { key: 'hitEntityTarget', label: '伤害实体-目标', type: 'select', defaultValue: 'hitEntity', section: '高级属性', showWhen: { field: 'weaponHitEnable', value: true }, options: [
+    { label: '被命中实体', value: 'hitEntity' }, { label: '攻击者', value: 'attackingEntity' },
+  ]},
+  // 击中方块时
+  { key: 'hitBlockRandomize', label: '击中方块-随机化', type: 'boolean', defaultValue: false, section: '高级属性', showWhen: { field: 'weaponHitEnable', value: true } },
+  { key: 'hitBlockFunction', label: '击中方块-函数', type: 'text', defaultValue: '', section: '高级属性', showWhen: { field: 'weaponHitEnable', value: true }, hint: 'Molang 表达式' },
+  { key: 'hitBlockTarget', label: '击中方块-目标', type: 'select', defaultValue: 'source', section: '高级属性', showWhen: { field: 'weaponHitEnable', value: true }, options: [
+    { label: '来源(使用者)', value: 'source' },
+  ]},
+
+  // 动能武器
+  { key: 'kineticWeaponEnable', label: '动能武器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '如三叉戟的冲刺攻击机制' },
+  { key: 'kineticDelay', label: '延迟(tick)', type: 'number', defaultValue: 13, min: 0, max: 100, step: 1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticReachMin', label: '最小触及', type: 'number', defaultValue: 2, min: 0, max: 20, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticReachMax', label: '最大触及', type: 'number', defaultValue: 4.5, min: 0, max: 20, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticCreativeReachMin', label: '创意最小触及', type: 'number', defaultValue: 2, min: 0, max: 30, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticCreativeReachMax', label: '创意最大触及', type: 'number', defaultValue: 7.5, min: 0, max: 30, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticHitboxMargin', label: '碰撞箱边距', type: 'number', defaultValue: 0.25, min: 0, max: 5, step: 0.05, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticDamageMultiplier', label: '伤害乘数', type: 'number', defaultValue: 0.82, min: 0, max: 10, step: 0.01, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticDamageMaxDuration', label: '损坏-最大持续时间', type: 'number', defaultValue: 250, min: 0, max: 9999, step: 1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticDamageMinRelSpeed', label: '损坏-最小相对速度', type: 'number', defaultValue: 4.6, min: 0, max: 100, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticKnockbackMaxDuration', label: '击退-最大持续时间', type: 'number', defaultValue: 100, min: 0, max: 9999, step: 1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticKnockbackMinSpeed', label: '击退-最小速度', type: 'number', defaultValue: 5.1, min: 0, max: 100, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticDismountMaxDuration', label: '下坐-最大持续时间', type: 'number', defaultValue: 80, min: 0, max: 9999, step: 1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+  { key: 'kineticDismountMinSpeed', label: '下坐-最小速度', type: 'number', defaultValue: 12, min: 0, max: 100, step: 0.1, section: '高级属性', showWhen: { field: 'kineticWeaponEnable', value: true } },
+
+  // 穿刺武器
+  { key: 'piercingWeaponEnable', label: '穿刺武器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '可穿透多个实体的攻击' },
+  { key: 'piercingReachMin', label: '最小触及', type: 'number', defaultValue: 2, min: 0, max: 20, step: 0.1, section: '高级属性', showWhen: { field: 'piercingWeaponEnable', value: true } },
+  { key: 'piercingReachMax', label: '最大触及', type: 'number', defaultValue: 4.5, min: 0, max: 20, step: 0.1, section: '高级属性', showWhen: { field: 'piercingWeaponEnable', value: true } },
+  { key: 'piercingCreativeReachMin', label: '创意最小触及', type: 'number', defaultValue: 2, min: 0, max: 30, step: 0.1, section: '高级属性', showWhen: { field: 'piercingWeaponEnable', value: true } },
+  { key: 'piercingCreativeReachMax', label: '创意最大触及', type: 'number', defaultValue: 7.5, min: 0, max: 30, step: 0.1, section: '高级属性', showWhen: { field: 'piercingWeaponEnable', value: true } },
+  { key: 'piercingHitboxMargin', label: '碰撞箱边距', type: 'number', defaultValue: 0.25, min: 0, max: 5, step: 0.05, section: '高级属性', showWhen: { field: 'piercingWeaponEnable', value: true } },
+
+  // 使用修饰符
+  { key: 'useModifiersEnable', label: '使用修饰符', type: 'boolean', defaultValue: false, section: '高级属性' },
+  { key: 'useModifiersEmitVibration', label: '是否发出振动', type: 'boolean', defaultValue: false, section: '高级属性', showWhen: { field: 'useModifiersEnable', value: true } },
+  { key: 'useModifiersMovement', label: '移动修正', type: 'number', defaultValue: 1, min: 0, max: 10, step: 0.05, section: '高级属性', showWhen: { field: 'useModifiersEnable', value: true }, hint: '1=正常速度，<1=减速' },
+  { key: 'useModifiersDuration', label: '使用时长(tick)', type: 'number', defaultValue: 72000, min: 0, max: 999999, step: 1, section: '高级属性', showWhen: { field: 'useModifiersEnable', value: true } },
+
+  // 射击者
+  { key: 'shooterEnable', label: '射击者', type: 'boolean', defaultValue: false, section: '高级属性', hint: '启用射击机制（弓/弩）' },
+  { key: 'shooterAmmunition', label: '弹药', type: 'text', defaultValue: 'minecraft:arrow', section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+  { key: 'shooterChargeOnDraw', label: '抽签收费', type: 'boolean', defaultValue: false, section: '高级属性', showWhen: { field: 'shooterEnable', value: true }, hint: '绘制时即开始充能' },
+  { key: 'shooterMaxDrawDuration', label: '最大绘制时长', type: 'number', defaultValue: 1.5, min: 0.1, max: 10, step: 0.1, section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+  { key: 'shooterScalePower', label: '按绘制时间调整功率', type: 'boolean', defaultValue: true, section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+
+  // 实体放置器
   { key: 'entityPlacerEnable', label: '实体放置器', type: 'boolean', defaultValue: false, section: '高级属性' },
   { key: 'entityPlacerEntity', label: '生成的实体', type: 'text', defaultValue: 'minecraft:zombie', section: '高级属性', showWhen: { field: 'entityPlacerEnable', value: true } },
-  { key: 'weaponHitEventEnable', label: '武器命中事件', type: 'boolean', defaultValue: false, section: '高级属性' },
-  { key: 'onHurtEntityEvent', label: '命中实体事件', type: 'text', defaultValue: 'on_hurt_entity_event', section: '高级属性', showWhen: { field: 'weaponHitEventEnable', value: true } },
-  { key: 'onNotHurtEntityEvent', label: '未命中事件', type: 'text', defaultValue: 'on_not_hurt_entity_event', section: '高级属性', showWhen: { field: 'weaponHitEventEnable', value: true } },
-  { key: 'onHitBlockEvent', label: '命中方块事件', type: 'text', defaultValue: 'on_hit_block_event', section: '高级属性', showWhen: { field: 'weaponHitEventEnable', value: true } },
-  { key: 'shooterEnable', label: '射击者', type: 'boolean', defaultValue: false, section: '高级属性', hint: '启用射击机制（弓/弩）' },
-  { key: 'shooterAmmunition', label: '弹药类型', type: 'text', defaultValue: 'minecraft:arrow', section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
-  { key: 'shooterMaxDrawDuration', label: '最大拉弓时间', type: 'number', defaultValue: 1.5, min: 0.1, max: 10, step: 0.1, section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
-  { key: 'shooterScalePower', label: '按拉弓时间缩放威力', type: 'boolean', defaultValue: true, section: '高级属性', showWhen: { field: 'shooterEnable', value: true } },
+  { key: 'entityPlacerDispenseOn', label: '分发', type: 'blockList', defaultValue: [], section: '高级属性', showWhen: { field: 'entityPlacerEnable', value: true }, hint: '可从这些方块中分发' },
+  { key: 'entityPlacerUseOn', label: '可作用于', type: 'blockList', defaultValue: [], section: '高级属性', showWhen: { field: 'entityPlacerEnable', value: true }, hint: '只能在这些方块上放置实体' },
+
   { key: 'fireResistant', label: '耐火', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品在火焰和岩浆中不会被销毁' },
   { key: 'tags', label: '物品标签', type: 'text', defaultValue: '', section: '高级属性', hint: '多个标签用逗号分隔' },
 ];
