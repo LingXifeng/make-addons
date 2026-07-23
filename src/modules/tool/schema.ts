@@ -52,7 +52,7 @@ export const toolFields: FieldSchema[] = [
   // --- 交互属性 ---
   { key: 'repairableEnable', label: '启用可修复', type: 'boolean', defaultValue: false, section: '交互属性' },
   { key: 'repairableItems', label: '修复材料', type: 'repairItems', defaultValue: [], section: '交互属性', showWhen: { field: 'repairableEnable', value: true } },
-  { key: 'allowOffHand', label: '允许副手', type: 'boolean', defaultValue: false, section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
+  { key: 'allowOffHand', label: '允许副手', type: 'boolean', section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
   { key: 'fireResistant', label: '耐火', type: 'boolean', defaultValue: false, section: '交互属性' },
   { key: 'tags', label: '物品标签', type: 'text', defaultValue: '', section: '交互属性', hint: '多个标签用逗号分隔' },
 

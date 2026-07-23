@@ -58,9 +58,11 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
 
   const components = result['minecraft:item'].components;
 
-  // 设置物品栏分组
-  if (data.itemGroup && data.itemGroup !== '') {
-    result['minecraft:item'].description.menu_category.group = data.itemGroup;
+  // 设置物品栏分组（使用 schema 默认值作为后备）
+  const itemGroupField = module.fields.find(f => f.key === 'itemGroup');
+  const itemGroupValue = data.itemGroup ?? itemGroupField?.defaultValue;
+  if (itemGroupValue && itemGroupValue !== '') {
+    result['minecraft:item'].description.menu_category.group = itemGroupValue;
   }
 
   // 遍历字段设置值
@@ -68,17 +70,29 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     if (!checkCondition(field, data)) continue;
     if (field.type === 'section' || field.type === 'icon') continue;
 
-    const value = data[field.key];
+    // 使用 schema 默认值作为后备
+    const value = data[field.key] ?? field.defaultValue;
     if (value === undefined || value === null || value === '') continue;
 
     // 特殊字段处理
     if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup') continue;
+
+    // rarity 需要包装为 {value: ...} 格式
+    if (field.key === 'rarity') {
+      components['minecraft:rarity'] = { value };
+      continue;
+    }
 
     // 使用 jsonPath 直接设置
     if (field.jsonPath) {
       const fullPath = `minecraft:item.${field.jsonPath}`;
       setNestedValue(result, fullPath, value);
     }
+  }
+
+  // fireResistant 需要包装为 {value: true} 格式
+  if (data.fireResistant) {
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   // --- 特殊组件处理 ---
@@ -836,9 +850,11 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
 
   const components = result['minecraft:item'].components;
 
-  // 设置物品栏分组
-  if (data.itemGroup && data.itemGroup !== '') {
-    result['minecraft:item'].description.menu_category.group = data.itemGroup;
+  // 设置物品栏分组（使用 schema 默认值作为后备）
+  const itemGroupField = module.fields.find(f => f.key === 'itemGroup');
+  const itemGroupValue = data.itemGroup ?? itemGroupField?.defaultValue;
+  if (itemGroupValue && itemGroupValue !== '') {
+    result['minecraft:item'].description.menu_category.group = itemGroupValue;
   }
 
   // 遍历字段设置值（jsonPath 自动处理）
@@ -846,10 +862,16 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
     if (!checkCondition(field, data)) continue;
     if (field.type === 'section' || field.type === 'icon') continue;
 
-    const value = data[field.key];
+    const value = data[field.key] ?? field.defaultValue;
     if (value === undefined || value === null || value === '') continue;
 
     if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup' || field.key === 'normalType') continue;
+
+    // rarity 需要包装为 {value: ...} 格式
+    if (field.key === 'rarity') {
+      components['minecraft:rarity'] = { value };
+      continue;
+    }
 
     if (field.jsonPath) {
       const fullPath = `minecraft:item.${field.jsonPath}`;
@@ -875,6 +897,10 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
       comparator_signal: data.recordComparatorOutput ?? 15,
     };
   }
+
+  // 物品图标（贴图引用）— 用 identifier 作为贴图短名
+  const itemId = data.identifier || 'change_me';
+  components['minecraft:icon'] = itemId;
 
   // --- 耐火 ---
   if (data.fireResistant) {
@@ -1071,8 +1097,11 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
     components['minecraft:max_stack_size'] = data.maxStackSize;
   }
 
-  if (data.icon) {
-    components['minecraft:icon'] = { texture: data.icon };
+  // 图标（使用 schema 默认值作为后备）
+  const iconField = module.fields.find(f => f.key === 'icon');
+  const iconValue = data.icon || iconField?.defaultValue;
+  if (iconValue) {
+    components['minecraft:icon'] = { texture: iconValue };
   }
 
   if (data.displayName) {
@@ -1249,8 +1278,13 @@ function generateSpawnEgg(_module: ModuleDefinition, item: ProjectItem): Record<
     components['minecraft:max_stack_size'] = data.maxStackSize;
   }
 
-  if (data.icon) {
-    components['minecraft:icon'] = { texture: data.icon };
+  // 图标（使用 schema 默认值作为后备）
+  {
+    const iconField = module.fields.find(f => f.key === 'icon');
+    const iconValue = data.icon || iconField?.defaultValue;
+    if (iconValue) {
+      components['minecraft:icon'] = { texture: iconValue };
+    }
   }
 
   if (data.aliases?.length) {

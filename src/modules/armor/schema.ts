@@ -45,7 +45,7 @@ export const armorFields: FieldSchema[] = [
   { key: 'repairableEnable', label: '启用可修复', type: 'boolean', defaultValue: false, section: '交互属性' },
   { key: 'repairableItems', label: '修复材料', type: 'repairItems', defaultValue: [], section: '交互属性', showWhen: { field: 'repairableEnable', value: true } },
   { key: 'glint', label: '附魔光效', type: 'boolean', defaultValue: false, section: '交互属性', jsonPath: 'components.minecraft:glint' },
-  { key: 'allowOffHand', label: '允许副手', type: 'boolean', defaultValue: false, section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
+  { key: 'allowOffHand', label: '允许副手', type: 'boolean', section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
   { key: 'fuelEnable', label: '燃料', type: 'boolean', defaultValue: false, section: '交互属性' },
   { key: 'fuelDuration', label: '燃烧时间(秒)', type: 'number', defaultValue: 10, min: 0, max: 9999, step: 1, section: '交互属性', showWhen: { field: 'fuelEnable', value: true } },
   { key: 'fireResistant', label: '耐火', type: 'boolean', defaultValue: false, section: '交互属性' },
