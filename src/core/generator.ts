@@ -170,6 +170,12 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     components['minecraft:tags'] = { tags: [...existingTags, 'pa:has_continuous_effects'] };
   }
 
+  // 火焰附加：打上标记标签，由脚本在攻击时点燃生物
+  if ((module.id === 'weapon' || module.id === 'tool') && data.fireAspectEnable) {
+    const existingTags = components['minecraft:tags']?.tags || [];
+    components['minecraft:tags'] = { tags: [...existingTags, 'pa:fire_aspect'] };
+  }
+
   // 使用函数
   if (data.useFunctionEnable && data.useFunctionValue) {
     components['minecraft:on_use'] = { trigger: data.useFunctionValue };

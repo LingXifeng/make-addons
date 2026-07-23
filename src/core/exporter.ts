@@ -159,8 +159,26 @@ function collectContinuousEffects(items: { module: ModuleDefinition; item: Proje
   return entries;
 }
 
+// 收集火焰附加武器
+interface FireAspectEntry {
+  itemId: string;
+  seconds: number;
+}
+
+function collectFireAspectItems(items: { module: ModuleDefinition; item: ProjectItem }[]): FireAspectEntry[] {
+  const entries: FireAspectEntry[] = [];
+  for (const { module, item } of items) {
+    if (module.id !== 'weapon' && module.id !== 'tool') continue;
+    const data = item.data;
+    if (!data.fireAspectEnable) continue;
+    const id = `pa:${data.identifier || 'change_me'}`;
+    entries.push({ itemId: id, seconds: data.fireAspectSeconds || 4 });
+  }
+  return entries;
+}
+
 // 生成持续药水效果脚本
-function generateEffectScript(entries: ContinuousEffectEntry[]): string {
+function generateEffectScript(entries: ContinuousEffectEntry[], fireAspectEntries: FireAspectEntry[] = []): string {
   const effectMap = entries.map(e => {
     const effectsStr = e.effects.map(ef =>
       `    "${ef.effect}": { duration: ${(ef.duration || 10) + 3}, amplifier: ${ef.amplifier || 0}, showParticles: ${ef.visible} }`
@@ -168,10 +186,15 @@ function generateEffectScript(entries: ContinuousEffectEntry[]): string {
     return `  "${e.itemId}": {\n${effectsStr}\n  }`;
   }).join(',\n');
 
-  return `// 持续药水效果脚本 — 由 Make Addons 生成
-// 装备/武器上的药水效果在手持或穿戴时持续生效
-import { world, system } from "@minecraft/server";
+  const fireAspectMap = fireAspectEntries.map(e =>
+    `  "${e.itemId}": ${e.seconds}`
+  ).join(',\n');
 
+  const hasEffects = entries.length > 0;
+  const hasFireAspect = fireAspectEntries.length > 0;
+
+  // 持续效果部分
+  const effectScript = hasEffects ? `
 const EFFECT_MAP = {
 ${effectMap}
 };
@@ -214,7 +237,41 @@ function applyEffects(player, effects) {
     } catch {}
   }
 }
-`;
+` : '';
+
+  // 火焰附加部分
+  const fireAspectScript = hasFireAspect ? `
+const FIRE_ASPECT_MAP = {
+${fireAspectMap}
+};
+
+// 监听实体受伤事件 — 攻击者手持火焰附加武器时点燃被攻击者
+world.afterEvents.entityHurt.subscribe((event) => {
+  try {
+    const attacker = event.damageSource.damagingEntity;
+    const victim = event.hurtEntity;
+    if (!attacker || !victim) return;
+
+    const inv = attacker.getComponent("minecraft:inventory");
+    if (!inv) return;
+    const mainHand = inv.itemHeld;
+    if (!mainHand) return;
+
+    const seconds = FIRE_ASPECT_MAP[mainHand.typeId];
+    if (seconds) {
+      victim.setOnFire(seconds);
+    }
+  } catch {}
+});
+` : '';
+
+  const parts = ['// 脚本 — 由 Make Addons 生成'];
+  if (hasEffects) parts.push('// 持续药水效果：装备/武器上的药水效果在手持或穿戴时持续生效');
+  if (hasFireAspect) parts.push('// 火焰附加：攻击生物时使其着火');
+  parts.push('import { world, system } from "@minecraft/server";');
+  parts.push(effectScript + fireAspectScript);
+
+  return parts.join('\n');
 }
 
 // 生成合成配方 JSON
@@ -314,9 +371,10 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     }
   }
 
-  // 检查是否需要脚本模块（装备/武器有药水效果）
+  // 检查是否需要脚本模块（装备/武器有药水效果 或 火焰附加）
   const continuousEffects = collectContinuousEffects(allItems);
-  const hasScript = continuousEffects.length > 0;
+  const fireAspectItems = collectFireAspectItems(allItems);
+  const hasScript = continuousEffects.length > 0 || fireAspectItems.length > 0;
 
   // 行为包 manifest
   files.push({
@@ -387,11 +445,11 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     });
   }
 
-  // 持续药水效果脚本 (装备/武器)
-  if (continuousEffects.length > 0) {
+  // 持续药水效果脚本 + 火焰附加脚本 (装备/武器)
+  if (continuousEffects.length > 0 || fireAspectItems.length > 0) {
     files.push({
       path: 'behavior_pack/scripts/effect_manager.js',
-      content: generateEffectScript(continuousEffects),
+      content: generateEffectScript(continuousEffects, fireAspectItems),
     });
   }
 

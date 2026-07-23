@@ -23,6 +23,8 @@ export const weaponFields: FieldSchema[] = [
   ]},
   { key: 'glint', label: '附魔光效', type: 'boolean', defaultValue: false, section: '战斗属性', jsonPath: 'components.minecraft:glint' },
   { key: 'handEquipped', label: '手持装备', type: 'boolean', defaultValue: true, section: '战斗属性', jsonPath: 'components.minecraft:hand_equipped', hint: 'true时像工具一样在手中显示3D模型' },
+  { key: 'fireAspectEnable', label: '火焰附加', type: 'boolean', defaultValue: false, section: '战斗属性', hint: '攻击生物时使其着火' },
+  { key: 'fireAspectSeconds', label: '燃烧时间(秒)', type: 'number', defaultValue: 4, min: 1, max: 30, step: 1, section: '战斗属性', showWhen: { field: 'fireAspectEnable', value: true } },
 
   // --- 物品栏属性 ---
   { key: 'maxStackSize', label: '最大堆叠数', type: 'number', defaultValue: 1, min: 1, max: 64, step: 1, section: '物品栏属性', jsonPath: 'components.minecraft:max_stack_size' },
