@@ -43,6 +43,16 @@ export const weaponFields: FieldSchema[] = [
     { label: '建造', value: 'construction' }, { label: '自然', value: 'nature' }, { label: '无', value: 'none' },
   ]},
 
+  // --- 通用属性 ---
+  { key: 'rarity', label: '稀有度', type: 'select', defaultValue: '', section: '通用属性', jsonPath: 'components.minecraft:rarity', options: [
+    { label: '无', value: '' }, { label: '普通', value: 'common' }, { label: '罕见', value: 'uncommon' }, { label: '稀有', value: 'rare' }, { label: '史诗', value: 'epic' },
+  ]},
+  { key: 'hoverText', label: '悬停文本', type: 'text', defaultValue: '', section: '通用属性', jsonPath: 'components.minecraft:hover_text.value', hint: '鼠标悬停时显示的附加文本' },
+  { key: 'liquidClipped', label: '液体裁剪', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:liquid_clipped', hint: '物品在液体中是否可使用' },
+  { key: 'despawn', label: '消失', type: 'boolean', defaultValue: true, section: '通用属性', jsonPath: 'components.minecraft:despawn', hint: '掉落后是否会消失' },
+  { key: 'shouldDespawnToChat', label: '消失到聊天', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:should_despawn_to_chat' },
+  { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', defaultValue: true, section: '通用属性', jsonPath: 'components.minecraft:can_destroy_in_creative' },
+
   // --- 交互属性 ---
   { key: 'repairableEnable', label: '启用可修复', type: 'boolean', defaultValue: false, section: '交互属性' },
   { key: 'repairableItems', label: '修复材料', type: 'repairItems', defaultValue: [], section: '交互属性', showWhen: { field: 'repairableEnable', value: true } },
@@ -144,6 +154,16 @@ export const weaponFields: FieldSchema[] = [
 
   { key: 'fireResistant', label: '耐火', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品在火焰和岩浆中不会被销毁' },
   { key: 'tags', label: '物品标签', type: 'text', defaultValue: '', section: '高级属性', hint: '多个标签用逗号分隔' },
+
+  // --- 合成配方 ---
+  { key: 'craftingEnable', label: '启用合成配方', type: 'boolean', defaultValue: false, section: '合成配方' },
+  { key: 'craftingType', label: '配方类型', type: 'select', defaultValue: 'shapeless', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, options: [
+    { label: '无序合成', value: 'shapeless' }, { label: '有序合成', value: 'shaped' },
+  ]},
+  { key: 'craftingIngredients', label: '合成材料', type: 'repairItems', defaultValue: [], section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '无序合成的材料列表' },
+  { key: 'craftingPattern', label: '合成图案', type: 'text', defaultValue: 'XX\nXX', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '有序合成图案，每行用\\n分隔，如 XX\\nXX' },
+  { key: 'craftingKey', label: '图案映射', type: 'text', defaultValue: 'X=minecraft:stick', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '字符=物品ID，每行一个，如 X=minecraft:stick' },
+  { key: 'craftingCount', label: '产物数量', type: 'number', defaultValue: 1, min: 1, max: 64, step: 1, section: '合成配方', showWhen: { field: 'craftingEnable', value: true } },
 ];
 
 // ===== 武器模块定义 =====

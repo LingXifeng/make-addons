@@ -110,6 +110,8 @@ function getItemFilePath(module: ModuleDefinition, item: ProjectItem): { behavio
     case 'weapon':
     case 'armor':
     case 'food':
+    case 'tool':
+    case 'normal':
       paths.behavior = `items/${id}.json`;
       break;
     case 'block':
@@ -215,6 +217,58 @@ function applyEffects(player, effects) {
 `;
 }
 
+// 生成合成配方 JSON
+function generateRecipeJSON(item: ProjectItem, module: ModuleDefinition): string | null {
+  const data = item.data;
+  if (!data.craftingEnable) return null;
+
+  const itemId = data.identifier || 'change_me';
+  const resultId = module.id === 'block' ? `pa:${itemId}` : `pa:${itemId}`;
+  const count = data.craftingCount || 1;
+  const recipeId = `pa:recipe_${itemId}`;
+
+  if (data.craftingType === 'shaped') {
+    // 有序合成
+    const pattern = (data.craftingPattern || 'XX\nXX').split('\n').filter((line: string) => line.length > 0);
+    const keyMap: Record<string, { item: string }> = {};
+    const keyLines = (data.craftingKey || '').split('\n').filter((line: string) => line.trim().length > 0);
+    for (const line of keyLines) {
+      const [char, itemPath] = line.split('=').map((s: string) => s.trim());
+      if (char && itemPath) {
+        keyMap[char] = { item: itemPath };
+      }
+    }
+    const recipe = {
+      format_version: '1.21.0',
+      'minecraft:recipe_shaped': {
+        description: { identifier: recipeId },
+        tags: ['crafting_table'],
+        pattern,
+        key: keyMap,
+        result: { item: resultId, count },
+      },
+    };
+    return JSON.stringify(recipe, null, 2);
+  } else {
+    // 无序合成
+    const ingredients = (data.craftingIngredients || []).map((ing: string) => {
+      // repairItems 格式可能是 "minecraft:stick" 或带冒号
+      return ing.includes(':') ? ing : `minecraft:${ing}`;
+    });
+    if (ingredients.length === 0) return null;
+    const recipe = {
+      format_version: '1.21.0',
+      'minecraft:recipe_shapeless': {
+        description: { identifier: recipeId },
+        tags: ['crafting_table'],
+        ingredients,
+        result: { item: resultId, count },
+      },
+    };
+    return JSON.stringify(recipe, null, 2);
+  }
+}
+
 // 生成语言文件
 function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectItem }[]): string {
   const lines: string[] = [];
@@ -228,6 +282,8 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
       case 'weapon':
       case 'armor':
       case 'food':
+      case 'tool':
+      case 'normal':
         lines.push(`item.${ns}:${id}.name=${name}`);
         break;
       case 'block':
@@ -301,6 +357,16 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
           content: JSON.stringify(clientJson, null, 2),
         });
       }
+    }
+
+    // 合成配方
+    const recipeJson = generateRecipeJSON(item, module);
+    if (recipeJson) {
+      const id = item.data.identifier || 'change_me';
+      files.push({
+        path: `behavior_pack/recipes/${id}_craft.json`,
+        content: recipeJson,
+      });
     }
   }
 

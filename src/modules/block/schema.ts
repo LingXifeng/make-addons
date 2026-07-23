@@ -67,6 +67,16 @@ export const blockFields: FieldSchema[] = [
   { key: 'waterlogged', label: '含水', type: 'boolean', defaultValue: false, section: '高级属性', hint: '方块可以包含水' },
   { key: 'breathable', label: '可呼吸', type: 'boolean', defaultValue: false, section: '高级属性' },
   { key: 'redstoneConductor', label: '红石导体', type: 'boolean', defaultValue: true, section: '高级属性' },
+
+  // --- 合成配方 ---
+  { key: 'craftingEnable', label: '启用合成配方', type: 'boolean', defaultValue: false, section: '合成配方' },
+  { key: 'craftingType', label: '配方类型', type: 'select', defaultValue: 'shapeless', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, options: [
+    { label: '无序合成', value: 'shapeless' }, { label: '有序合成', value: 'shaped' },
+  ]},
+  { key: 'craftingIngredients', label: '合成材料', type: 'repairItems', defaultValue: [], section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '无序合成的材料列表' },
+  { key: 'craftingPattern', label: '合成图案', type: 'text', defaultValue: 'XX\nXX', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '有序合成图案，每行用\\n分隔' },
+  { key: 'craftingKey', label: '图案映射', type: 'text', defaultValue: 'X=minecraft:stick', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '字符=物品ID，每行一个' },
+  { key: 'craftingCount', label: '产物数量', type: 'number', defaultValue: 1, min: 1, max: 64, step: 1, section: '合成配方', showWhen: { field: 'craftingEnable', value: true } },
 ];
 
 // ===== 方块模块定义 =====

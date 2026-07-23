@@ -6,6 +6,8 @@ import { blockModule } from './block/schema';
 import { entityModule } from './entity/schema';
 import { biomeModule } from './biome/schema';
 import { recipeModule } from './recipe/schema';
+import { toolModule } from './tool/schema';
+import { normalModule } from './normal/schema';
 
 // ===== 所有模块注册表 =====
 
@@ -13,6 +15,8 @@ export const allModules: ModuleDefinition[] = [
   weaponModule,
   armorModule,
   foodModule,
+  toolModule,
+  normalModule,
   blockModule,
   entityModule,
   biomeModule,
@@ -21,7 +25,7 @@ export const allModules: ModuleDefinition[] = [
 
 // 按类别分组
 export const modulesByCategory: Record<string, ModuleDefinition[]> = {
-  custom_items: [weaponModule, armorModule, foodModule, blockModule],
+  custom_items: [weaponModule, armorModule, foodModule, toolModule, normalModule, blockModule],
   custom_entities: [entityModule],
   custom_environment: [biomeModule],
   custom_recipes: [recipeModule],

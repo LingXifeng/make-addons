@@ -71,6 +71,7 @@ export type JsonRootKey =
 // 生成器类型
 export type GeneratorType =
   | 'weapon' | 'armor' | 'food' | 'shield' | 'bow' | 'crossbow' | 'arrow' | 'mace'
+  | 'tool' | 'normal'
   | 'block' | 'block_model' | 'block_slab' | 'block_stair' | 'block_fence' | 'block_wall'
   | 'block_door' | 'block_trapdoor' | 'block_fence_gate' | 'block_crop' | 'block_sapling'
   | 'block_layer' | 'block_transparent' | 'block_fluid'

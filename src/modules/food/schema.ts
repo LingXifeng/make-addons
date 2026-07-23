@@ -45,6 +45,16 @@ export const foodFields: FieldSchema[] = [
   { key: 'onUseEvent', label: '使用事件名称', type: 'text', defaultValue: 'on_use_event', section: '高级属性', showWhen: { field: 'onUseEnable', value: true } },
   { key: 'compostableEnable', label: '可堆肥', type: 'boolean', defaultValue: false, section: '高级属性', hint: '放入堆肥桶有概率提升堆肥等级' },
   { key: 'compostingChance', label: '堆肥概率', type: 'number', defaultValue: 0.3, min: 0, max: 1, step: 0.05, section: '高级属性', showWhen: { field: 'compostableEnable', value: true } },
+
+  // --- 合成配方 ---
+  { key: 'craftingEnable', label: '启用合成配方', type: 'boolean', defaultValue: false, section: '合成配方' },
+  { key: 'craftingType', label: '配方类型', type: 'select', defaultValue: 'shapeless', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, options: [
+    { label: '无序合成', value: 'shapeless' }, { label: '有序合成', value: 'shaped' },
+  ]},
+  { key: 'craftingIngredients', label: '合成材料', type: 'repairItems', defaultValue: [], section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '无序合成的材料列表' },
+  { key: 'craftingPattern', label: '合成图案', type: 'text', defaultValue: 'XX\nXX', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '有序合成图案，每行用\\n分隔' },
+  { key: 'craftingKey', label: '图案映射', type: 'text', defaultValue: 'X=minecraft:stick', section: '合成配方', showWhen: { field: 'craftingEnable', value: true }, hint: '字符=物品ID，每行一个' },
+  { key: 'craftingCount', label: '产物数量', type: 'number', defaultValue: 1, min: 1, max: 64, step: 1, section: '合成配方', showWhen: { field: 'craftingEnable', value: true } },
 ];
 
 // ===== 食物模块定义 =====

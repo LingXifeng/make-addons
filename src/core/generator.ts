@@ -133,10 +133,11 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
   // 挖掘工具
   if (data.diggerEnable && data.diggerBlocks?.length > 0) {
     if (!components['minecraft:digger']) {
-      components['minecraft:digger'] = { use_efficiency: true, destroy_speeds: [] };
+      components['minecraft:digger'] = { use_efficiency: data.useEfficiency !== false, destroy_speeds: [] };
     }
+    const digSpeed = data.diggerSpeed || 6;
     for (const block of data.diggerBlocks) {
-      components['minecraft:digger'].destroy_speeds.push({ block, speed: 6 });
+      components['minecraft:digger'].destroy_speeds.push({ block, speed: digSpeed });
     }
   }
 
@@ -808,13 +809,93 @@ function generateRecipe(_module: ModuleDefinition, item: ProjectItem): Record<st
   return { format_version: '1.21.100' };
 }
 
+// ===== 普通物品生成器 =====
+function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const identifier = `${ns}:${data.identifier || 'change_me'}`;
+
+  const result: Record<string, any> = {
+    format_version: '1.21.100',
+    'minecraft:item': {
+      description: {
+        identifier,
+        menu_category: {
+          category: data.menuCategory || 'items',
+        },
+      },
+      components: {} as Record<string, any>,
+    },
+  };
+
+  const components = result['minecraft:item'].components;
+
+  // 设置物品栏分组
+  if (data.itemGroup && data.itemGroup !== '') {
+    result['minecraft:item'].description.menu_category.group = data.itemGroup;
+  }
+
+  // 遍历字段设置值（jsonPath 自动处理）
+  for (const field of module.fields) {
+    if (!checkCondition(field, data)) continue;
+    if (field.type === 'section' || field.type === 'icon') continue;
+
+    const value = data[field.key];
+    if (value === undefined || value === null || value === '') continue;
+
+    if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup' || field.key === 'normalType') continue;
+
+    if (field.jsonPath) {
+      const fullPath = `minecraft:item.${field.jsonPath}`;
+      setNestedValue(result, fullPath, value);
+    }
+  }
+
+  // --- 燃料 ---
+  if (data.fuelEnable && data.fuelDuration !== undefined) {
+    components['minecraft:fuel'] = { duration: data.fuelDuration };
+  }
+
+  // --- 堆肥 ---
+  if (data.compostableEnable && data.compostingChance !== undefined) {
+    components['minecraft:compostable'] = { composting_chance: data.compostingChance };
+  }
+
+  // --- 唱片 ---
+  if (data.recordEnable) {
+    components['minecraft:record'] = {
+      sound_event: data.recordSoundEvent || 'music.menu',
+      duration: data.recordDuration || 120,
+      comparator_signal: data.recordComparatorOutput ?? 15,
+    };
+  }
+
+  // --- 耐火 ---
+  if (data.fireResistant) {
+    components['minecraft:fire_resistant'] = {};
+  }
+
+  // --- 标签 ---
+  if (data.tags) {
+    const tags = data.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+    for (const tag of tags) {
+      components[`tag:${tag}`] = {};
+    }
+  }
+
+  return result;
+}
+
 // ===== 主生成函数 =====
 export function generateItemJSON(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
   switch (module.id) {
     case 'weapon':
     case 'armor':
     case 'food':
+    case 'tool':
       return generateItem(module, item);
+    case 'normal':
+      return generateNormal(module, item);
     case 'block':
       return generateBlock(module, item);
     case 'entity':
