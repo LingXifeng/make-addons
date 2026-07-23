@@ -61,7 +61,7 @@ function FieldInput({ field, value, data, onChange, iconDir, onTextureUpload, cu
       <label className="field-label">{field.label}</label>
       {field.hint && <span className="field-hint">{field.hint}</span>}
       <div className="field-control">
-        {renderControl(field, value, onChange, iconDir, onTextureUpload, customTexture)}
+        {renderControl(field, value, data, onChange, iconDir, onTextureUpload, customTexture)}
       </div>
     </div>
   );
@@ -70,6 +70,7 @@ function FieldInput({ field, value, data, onChange, iconDir, onTextureUpload, cu
 function renderControl(
   field: FieldSchema,
   value: any,
+  data: Record<string, any>,
   onChange: (key: string, value: any) => void,
   iconDir?: string,
   onTextureUpload?: (file: File) => void,
@@ -137,6 +138,71 @@ function renderControl(
       return (
         <BlockListInput
           value={value || []}
+          onChange={v => onChange(field.key, v)}
+        />
+      );
+
+    case 'itemList':
+      return (
+        <ItemListInput
+          value={value || []}
+          onChange={v => onChange(field.key, v)}
+        />
+      );
+
+    case 'stringList':
+      return (
+        <StringListInput
+          value={value || []}
+          onChange={v => onChange(field.key, v)}
+        />
+      );
+
+    case 'color':
+      return (
+        <input
+          type="color"
+          value={value || '#000000'}
+          onChange={e => onChange(field.key, e.target.value)}
+        />
+      );
+
+    case 'texture':
+      return (
+        <div className="texture-field">
+          {customTexture && (
+            <img src={customTexture.dataUrl} alt="texture" className="texture-preview" />
+          )}
+          {onTextureUpload && (
+            <label className="upload-btn">
+              上传纹理
+              <input
+                type="file"
+                accept="image/png"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) onTextureUpload(file);
+                }}
+              />
+            </label>
+          )}
+        </div>
+      );
+
+    case 'recipePattern':
+      return (
+        <RecipePatternInput
+          value={value || ['', '', '']}
+          onChange={v => onChange(field.key, v)}
+        />
+      );
+
+    case 'recipeItems':
+      return (
+        <RecipeItemsInput
+          value={value || {}}
+          data={data}
           onChange={v => onChange(field.key, v)}
         />
       );
@@ -408,6 +474,147 @@ function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: a
       <button onClick={() => onChange([...value, { effect: 'speed', amplifier: 0, duration: 10, visible: true }])}>
         + 添加药水效果
       </button>
+    </div>
+  );
+}
+
+// ===== 物品列表输入 =====
+
+function ItemListInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [input, setInput] = useState('');
+
+  return (
+    <div className="item-list-input">
+      <div className="tag-list">
+        {value.map((item, i) => (
+          <span key={i} className="tag">
+            {item}
+            <button onClick={() => onChange(value.filter((_, j) => j !== i))}>✕</button>
+          </span>
+        ))}
+      </div>
+      <div className="tag-input-row">
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder="minecraft:item_id"
+          onKeyDown={e => {
+            if (e.key === 'Enter' && input.trim()) {
+              onChange([...value, input.trim()]);
+              setInput('');
+            }
+          }}
+        />
+        <button onClick={() => {
+          if (input.trim()) {
+            onChange([...value, input.trim()]);
+            setInput('');
+          }
+        }}>添加</button>
+      </div>
+    </div>
+  );
+}
+
+// ===== 字符串列表输入 =====
+
+function StringListInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [input, setInput] = useState('');
+
+  return (
+    <div className="string-list-input">
+      <div className="tag-list">
+        {value.map((s, i) => (
+          <span key={i} className="tag">
+            {s}
+            <button onClick={() => onChange(value.filter((_, j) => j !== i))}>✕</button>
+          </span>
+        ))}
+      </div>
+      <div className="tag-input-row">
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder="输入字符串"
+          onKeyDown={e => {
+            if (e.key === 'Enter' && input.trim()) {
+              onChange([...value, input.trim()]);
+              setInput('');
+            }
+          }}
+        />
+        <button onClick={() => {
+          if (input.trim()) {
+            onChange([...value, input.trim()]);
+            setInput('');
+          }
+        }}>添加</button>
+      </div>
+    </div>
+  );
+}
+
+// ===== 配方图案输入 =====
+
+function RecipePatternInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const rows = value.length > 0 ? value : ['', '', ''];
+
+  return (
+    <div className="recipe-pattern-input">
+      {rows.map((row, i) => (
+        <div key={i} className="recipe-pattern-row">
+          <label>第{i + 1}行</label>
+          <input
+            type="text"
+            value={row}
+            maxLength={3}
+            onChange={e => {
+              const newValue = [...rows];
+              newValue[i] = e.target.value;
+              onChange(newValue);
+            }}
+            placeholder="如 ABC 或空"
+          />
+        </div>
+      ))}
+      <p className="field-hint">使用字母代表材料，在下方映射到具体物品</p>
+    </div>
+  );
+}
+
+// ===== 配方物品映射输入 =====
+
+function RecipeItemsInput({ value, onChange, data }: { value: Record<string, string>; onChange: (v: Record<string, string>) => void; data: Record<string, any> }) {
+  // 从 pattern 中提取所有使用的字符
+  const pattern: string[] = data.pattern || ['', '', ''];
+  const usedChars = new Set<string>();
+  for (const row of pattern) {
+    for (const char of row) {
+      if (char !== ' ' && char.trim()) {
+        usedChars.add(char);
+      }
+    }
+  }
+
+  const chars = Array.from(usedChars).sort();
+
+  return (
+    <div className="recipe-items-input">
+      {chars.length === 0 && <p className="field-hint">请先填写合成图案</p>}
+      {chars.map(char => (
+        <div key={char} className="recipe-item-mapping">
+          <span className="recipe-key">{char}</span>
+          <span>→</span>
+          <input
+            type="text"
+            value={value[char] || ''}
+            onChange={e => onChange({ ...value, [char]: e.target.value })}
+            placeholder="minecraft:item_id"
+          />
+        </div>
+      ))}
     </div>
   );
 }

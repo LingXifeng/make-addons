@@ -1,234 +1,266 @@
-import JSZip from 'jszip';
-import type { ProjectItem } from './types';
-import { generateItemJson, generateItemTextureEntry, generateLangEntry } from './generator';
-import { getModuleById } from '../modules';
+import type { ModuleDefinition, ProjectItem, Project } from './types';
+import { generateItemJSON, generateClientEntity } from './generator';
 
-// ===== 生成完整 Addon 结构 =====
+// ===== 导出器 =====
+// 生成 .mcaddon (zip) 文件，包含完整附加包结构
 
-export async function generateAddon(project: { name: string; namespace: string; items: ProjectItem[] }): Promise<{ zip: JSZip; fileCount: number }> {
-  const zip = new JSZip();
-  let fileCount = 0;
-  const namespace = project.namespace || 'pa';
-
-  // 生成匹配的 UUID 对
-  const bpUuid = uuid();
-  const rpUuid = uuid();
-
-  // === Behavior Pack ===
-  const bp = zip.folder('behavior_pack')!;
-  const bpManifest = createBehaviorManifest(project.name, namespace, bpUuid, rpUuid);
-  bp.file('manifest.json', JSON.stringify(bpManifest, null, 2));
-  fileCount++;
-
-  const bpItems = bp.folder('items')!;
-
-  // === Resource Pack ===
-  const rp = zip.folder('resource_pack')!;
-  const rpManifest = createResourceManifest(project.name, namespace, rpUuid, bpUuid);
-  rp.file('manifest.json', JSON.stringify(rpManifest, null, 2));
-  fileCount++;
-
-  const rpTextures = rp.folder('textures')!.folder('items')!;
-  const rpLang = rp.folder('texts')!;
-
-  // 收集纹理和语言条目
-  const textureData: Record<string, { textures: string }> = {};
-  const langEntries: string[] = [];
-
-  // 加载图标清单
-  let iconManifest: Record<string, string[]> = {};
-  try {
-    const response = await fetch(`${import.meta.env.BASE_URL}assets/icon_manifest.json`);
-    iconManifest = await response.json();
-  } catch (e) {
-    // 清单加载失败，继续处理
-  }
-
-  // 查找图标路径
-  function findIconPath(iconDir: string, iconName: string): string | null {
-    for (const [dir, names] of Object.entries(iconManifest)) {
-      if ((dir === iconDir || dir.startsWith(iconDir + '/')) && names.includes(iconName)) {
-        return `icons/${dir}/${iconName}.png`;
-      }
-    }
-    return null;
-  }
-
-  // 处理每个物品
-  for (const item of project.items) {
-    const module = getModuleById(item.moduleId);
-    if (!module) continue;
-
-    // 生成 item JSON
-    const itemJson = await generateItemJson(module, item, item.subTypeId);
-    const id = item.data.identifier || 'change_me';
-    const fileName = `${namespace}_${id}.json`;
-
-    // 写入 behavior pack
-    bpItems.file(fileName, JSON.stringify(itemJson, null, 2));
-    fileCount++;
-
-    // 纹理注册
-    const { textureName, texturePath } = generateItemTextureEntry(item, namespace);
-    textureData[textureName] = { textures: texturePath };
-
-    // 语言条目
-    langEntries.push(generateLangEntry(item, namespace));
-
-    // 自定义纹理
-    if (item.customTexture) {
-      const base64Data = item.customTexture.dataUrl.split(',')[1];
-      rpTextures.file(`${textureName}.png`, base64Data, { base64: true });
-      fileCount++;
-    } else {
-      // 从 public/assets/icons/ 复制预设图标
-      const iconDir = module.iconDir;
-      const iconName = item.data.icon;
-      const iconPath = findIconPath(iconDir, iconName);
-      if (iconPath) {
-        try {
-          const response = await fetch(`${import.meta.env.BASE_URL}assets/${iconPath}`);
-          if (response.ok) {
-            const blob = await response.blob();
-            rpTextures.file(`${textureName}.png`, blob);
-            fileCount++;
-          }
-        } catch (e) {
-          // 图标不存在，跳过
-        }
-      }
-    }
-
-    // 生成 attachable 文件（武器需要）
-    if (module.generatorType === 'weapon' || module.generatorType === 'bow' || module.generatorType === 'crossbow') {
-      const attachable = generateAttachable(namespace, id, module.generatorType);
-      const attachableDir = rp.folder('attachables')!;
-      attachableDir.file(`${namespace}_${id}.json`, JSON.stringify(attachable, null, 2));
-      fileCount++;
-    }
-  }
-
-  // 写入 item_texture.json
-  const itemTexture = {
-    resource_pack_name: namespace,
-    texture_name: 'atlas.items',
-    texture_data: textureData,
-  };
-  rp.file('item_texture.json', JSON.stringify(itemTexture, null, 2));
-  fileCount++;
-
-  // 写入语言文件
-  rpLang.file('en_US.lang', langEntries.join('\n') + '\n');
-  rpLang.file('zh_CN.lang', langEntries.join('\n') + '\n');
-  fileCount += 2;
-
-  return { zip, fileCount };
+interface AddonFile {
+  path: string;
+  content: string;
 }
 
-// ===== 导出为 .mcaddon 文件 =====
-
-export async function exportMcaddon(project: { name: string; namespace: string; items: ProjectItem[] }): Promise<Blob> {
-  const { zip } = await generateAddon(project);
-  return zip.generateAsync({ type: 'blob' });
+// 生成 UUID
+function generateUUID(): string {
+  const hex = '0123456789abcdef';
+  let uuid = '';
+  for (let i = 0; i < 32; i++) {
+    if (i === 8 || i === 12 || i === 16 || i === 20) uuid += '-';
+    uuid += hex[Math.floor(Math.random() * 16)];
+  }
+  return uuid;
 }
 
-// ===== Manifest 生成 =====
+// 生成行为包 manifest
+function generateBehaviorManifest(project: Project): string {
+  const headerUUID = project.headerUUID || generateUUID();
+  const moduleUUID = project.moduleUUID || generateUUID();
 
-function uuid(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-function createBehaviorManifest(name: string, _namespace: string, bpUuid: string, rpUuid: string): any {
-  return {
+  const manifest = {
     format_version: 2,
     header: {
-      name: `${name} - BP`,
-      description: `${name} Behavior Pack`,
-      uuid: bpUuid,
+      name: project.name || 'My Addon',
+      description: project.description || 'Made with Make Addons',
+      uuid: headerUUID,
       version: [1, 0, 0],
-      min_engine_version: [1, 21, 100],
+      min_engine_version: [1, 21, 0],
     },
     modules: [
       {
         type: 'data',
-        uuid: uuid(),
+        uuid: moduleUUID,
         version: [1, 0, 0],
       },
     ],
-    dependencies: [
-      {
-        uuid: rpUuid,
-        version: [1, 0, 0],
-      },
-    ],
+    dependencies: [],
   };
+
+  return JSON.stringify(manifest, null, 2);
 }
 
-function createResourceManifest(name: string, _namespace: string, rpUuid: string, bpUuid: string): any {
-  return {
+// 生成资源包 manifest
+function generateResourceManifest(project: Project): string {
+  const headerUUID = project.resourceHeaderUUID || generateUUID();
+  const moduleUUID = project.resourceModuleUUID || generateUUID();
+  const behaviorUUID = project.headerUUID || '';
+
+  const manifest: Record<string, any> = {
     format_version: 2,
     header: {
-      name: `${name} - RP`,
-      description: `${name} Resource Pack`,
-      uuid: rpUuid,
+      name: project.name || 'My Addon',
+      description: project.description || 'Made with Make Addons',
+      uuid: headerUUID,
       version: [1, 0, 0],
-      min_engine_version: [1, 21, 100],
+      min_engine_version: [1, 21, 0],
     },
     modules: [
       {
         type: 'resources',
-        uuid: uuid(),
-        version: [1, 0, 0],
-      },
-    ],
-    dependencies: [
-      {
-        uuid: bpUuid,
+        uuid: moduleUUID,
         version: [1, 0, 0],
       },
     ],
   };
+
+  if (behaviorUUID) {
+    manifest.dependencies = [
+      {
+        uuid: behaviorUUID,
+        version: [1, 0, 0],
+      },
+    ];
+  }
+
+  return JSON.stringify(manifest, null, 2);
 }
 
-// ===== Attachable 生成 =====
+// 获取模块文件路径
+function getItemFilePath(module: ModuleDefinition, item: ProjectItem): { behavior?: string; resource?: string } {
+  const id = item.data.identifier || 'change_me';
+  const paths: { behavior?: string; resource?: string } = {};
 
-function generateAttachable(namespace: string, id: string, _type: string): any {
-  const identifier = `${namespace}:${id}`;
-  return {
-    format_version: '1.10.0',
-    'minecraft:attachable': {
-      description: {
-        identifier,
-        materials: {
-          default: 'entity_alphatest',
-          enchanted: 'entity_alphatest_glint',
-        },
-        textures: {
-          default: `textures/items/${namespace}_${id}`,
-          enchanted: 'textures/misc/enchanted_item_glint',
-        },
-        geometry: {
-          default: `geometry.${namespace}_${id}`,
-        },
-        animations: {
-          wield_first_person: `animation.${namespace}_${id}.first_person`,
-          wield_third_person: `animation.${namespace}_${id}.third_person`,
-        },
-        scripts: {
-          pre_animation: [
-            'variable.charge_amount = math.clamp((query.main_hand_item_max_duration - (query.main_hand_item_use_duration - query.frame_alpha + 1.0)) / 10.0, 0.0, 1.0f);',
-          ],
-          animate: [
-            { wield_first_person: 'c.is_first_person' },
-            { wield_third_person: '!c.is_first_person' },
-          ],
-        },
-        render_controllers: ['controller.render.item_default'],
-      },
-    },
-  };
+  switch (module.id) {
+    case 'weapon':
+    case 'armor':
+    case 'food':
+      paths.behavior = `items/${id}.json`;
+      break;
+    case 'block':
+      paths.behavior = `blocks/${id}.json`;
+      break;
+    case 'entity':
+      paths.behavior = `entities/${id}.json`;
+      paths.resource = `entity/${id}.client.json`;
+      break;
+    case 'biome':
+      paths.behavior = `biomes/${id}.json`;
+      break;
+    case 'recipe':
+      paths.behavior = `recipes/${id}.json`;
+      break;
+  }
+
+  return paths;
+}
+
+// 生成语言文件
+function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectItem }[]): string {
+  const lines: string[] = [];
+
+  for (const { module, item } of items) {
+    const id = item.data.identifier || 'change_me';
+    const name = item.data.displayName || id;
+    const ns = 'pa';
+
+    switch (module.id) {
+      case 'weapon':
+      case 'armor':
+      case 'food':
+        lines.push(`item.${ns}:${id}.name=${name}`);
+        break;
+      case 'block':
+        lines.push(`tile.${ns}:${id}.name=${name}`);
+        break;
+      case 'entity':
+        lines.push(`entity.${ns}:${id}.name=${name}`);
+        break;
+      case 'biome':
+        lines.push(`biome.${id}.name=${name}`);
+        break;
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// 生成所有文件
+export function generateAddonFiles(project: Project, modules: ModuleDefinition[]): AddonFile[] {
+  const files: AddonFile[] = [];
+
+  // 行为包 manifest
+  files.push({
+    path: 'behavior_pack/manifest.json',
+    content: generateBehaviorManifest(project),
+  });
+
+  // 资源包 manifest
+  files.push({
+    path: 'resource_pack/manifest.json',
+    content: generateResourceManifest(project),
+  });
+
+  // 行为包 pack_icon (placeholder)
+  files.push({
+    path: 'behavior_pack/pack_icon.png',
+    content: '', // Will be handled separately
+  });
+
+  // 收集所有项目
+  const allItems: { module: ModuleDefinition; item: ProjectItem }[] = [];
+  for (const module of modules) {
+    const items = project.items[module.id] || [];
+    for (const item of items) {
+      allItems.push({ module, item });
+    }
+  }
+
+  // 生成每个项目的 JSON 文件
+  for (const { module, item } of allItems) {
+    const json = generateItemJSON(module, item);
+    const paths = getItemFilePath(module, item);
+
+    if (paths.behavior) {
+      files.push({
+        path: `behavior_pack/${paths.behavior}`,
+        content: JSON.stringify(json, null, 2),
+      });
+    }
+
+    // 实体客户端定义
+    if (module.id === 'entity') {
+      const clientJson = generateClientEntity(item);
+      if (clientJson && paths.resource) {
+        files.push({
+          path: `resource_pack/${paths.resource}`,
+          content: JSON.stringify(clientJson, null, 2),
+        });
+      }
+    }
+  }
+
+  // 语言文件
+  if (allItems.length > 0) {
+    const langContent = generateLanguageFile(allItems);
+    files.push({
+      path: 'resource_pack/texts/zh_CN.lang',
+      content: langContent,
+    });
+    files.push({
+      path: 'resource_pack/texts/en_US.lang',
+      content: langContent,
+    });
+    files.push({
+      path: 'resource_pack/texts/languages.json',
+      content: JSON.stringify(['zh_CN', 'en_US'], null, 2),
+    });
+  }
+
+  return files;
+}
+
+// 生成单个项目的预览 JSON
+export function generatePreviewJSON(module: ModuleDefinition, item: ProjectItem): string {
+  const json = generateItemJSON(module, item);
+  return JSON.stringify(json, null, 2);
+}
+
+// 导出为 zip 文件 (使用浏览器 API)
+export async function exportAsMcaddon(project: Project, modules: ModuleDefinition[]): Promise<Blob> {
+  const files = generateAddonFiles(project, modules);
+
+  // 动态导入 JSZip
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+
+  // 行为包文件夹
+  const behaviorFolder = zip.folder('behavior_pack')!;
+  const resourceFolder = zip.folder('resource_pack')!;
+
+  for (const file of files) {
+    if (file.path.startsWith('behavior_pack/')) {
+      const relPath = file.path.replace('behavior_pack/', '');
+      if (relPath && file.content) {
+        behaviorFolder.file(relPath, file.content);
+      }
+    } else if (file.path.startsWith('resource_pack/')) {
+      const relPath = file.path.replace('resource_pack/', '');
+      if (relPath && file.content) {
+        resourceFolder.file(relPath, file.content);
+      }
+    }
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  return blob;
+}
+
+// 下载文件
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

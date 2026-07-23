@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, ProjectItem } from '../core/types';
+import type { Project, ProjectItem, SubType } from '../core/types';
 import { createDefaultFormData } from '../core/generator';
 import { getModuleById } from '../modules';
 
@@ -32,7 +32,7 @@ function createItem(moduleId: string, subTypeId?: string): ProjectItem {
   const module = getModuleById(moduleId);
   if (!module) throw new Error(`Module ${moduleId} not found`);
 
-  const subType = subTypeId ? module.subTypes?.find(s => s.id === subTypeId) : undefined;
+  const subType = subTypeId ? module.subTypes?.find((s: SubType) => s.id === subTypeId) : undefined;
   const fields = subType?.fields || module.fields;
   const data = createDefaultFormData(fields);
 
@@ -51,7 +51,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     name: '我的Addon',
     description: '',
     namespace: 'pa',
-    items: [],
+    items: {},
   },
   selectedItemId: null,
   selectedModuleId: null,
@@ -62,56 +62,68 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   addItem: (moduleId, subTypeId) => {
     const item = createItem(moduleId, subTypeId);
     set(state => ({
-      project: { ...state.project, items: [...state.project.items, item] },
+      project: {
+        ...state.project,
+        items: {
+          ...state.project.items,
+          [moduleId]: [...(state.project.items[moduleId] || []), item],
+        },
+      },
       selectedItemId: item.id,
     }));
     get().saveToStorage();
   },
 
   removeItem: (id) => {
-    set(state => ({
-      project: {
-        ...state.project,
-        items: state.project.items.filter(i => i.id !== id),
-      },
-      selectedItemId: state.selectedItemId === id ? null : state.selectedItemId,
-    }));
+    set(state => {
+      const newItems: Record<string, ProjectItem[]> = {};
+      for (const [modId, items] of Object.entries(state.project.items)) {
+        newItems[modId] = items.filter(i => i.id !== id);
+      }
+      return {
+        project: { ...state.project, items: newItems },
+        selectedItemId: state.selectedItemId === id ? null : state.selectedItemId,
+      };
+    });
     get().saveToStorage();
   },
 
   updateItem: (id, data) => {
-    set(state => ({
-      project: {
-        ...state.project,
-        items: state.project.items.map(i =>
+    set(state => {
+      const newItems: Record<string, ProjectItem[]> = {};
+      for (const [modId, items] of Object.entries(state.project.items)) {
+        newItems[modId] = items.map(i =>
           i.id === id ? { ...i, data: { ...i.data, ...data } } : i
-        ),
-      },
-    }));
+        );
+      }
+      return { project: { ...state.project, items: newItems } };
+    });
     get().saveToStorage();
   },
 
   updateItemField: (id, field, value) => {
-    set(state => ({
-      project: {
-        ...state.project,
-        items: state.project.items.map(i =>
+    set(state => {
+      const newItems: Record<string, ProjectItem[]> = {};
+      for (const [modId, items] of Object.entries(state.project.items)) {
+        newItems[modId] = items.map(i =>
           i.id === id ? { ...i, data: { ...i.data, [field]: value } } : i
-        ),
-      },
-    }));
+        );
+      }
+      return { project: { ...state.project, items: newItems } };
+    });
     get().saveToStorage();
   },
 
   setCustomTexture: (id, texture) => {
-    set(state => ({
-      project: {
-        ...state.project,
-        items: state.project.items.map(i =>
+    set(state => {
+      const newItems: Record<string, ProjectItem[]> = {};
+      for (const [modId, items] of Object.entries(state.project.items)) {
+        newItems[modId] = items.map(i =>
           i.id === id ? { ...i, customTexture: texture } : i
-        ),
-      },
-    }));
+        );
+      }
+      return { project: { ...state.project, items: newItems } };
+    });
     get().saveToStorage();
   },
 

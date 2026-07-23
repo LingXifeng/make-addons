@@ -1,0 +1,1 @@
+{"format_version":"1.13.0","minecraft:growing_plant_feature":{"body_blocks":[["minecraft:waxed_oxidized_double_cut_copper_slab",1]],"head_blocks":[["minecraft:weathered_cut_copper",1]],"age":{"range_min":1,"range_max":5},"growth_direction":"up","height_distribution":[[{"range_min":4,"range_max":12},1]],"description":{"identifier":"pa:custom_plant_feature"},"allow_water":false}}

@@ -1,453 +1,787 @@
-import type { FieldSchema, ModuleDefinition, ProjectItem } from './types';
+import type { ModuleDefinition, ProjectItem, FieldSchema } from './types';
 
-// ===== 深层路径设置/获取 =====
+// ===== JSON 生成器 =====
+// 根据 schema + 用户数据生成 Minecraft 附加包 JSON
 
-export function setByPath(obj: any, path: string, value: any): void {
-  const parts = path.split('.');
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const key = parts[i];
-    if (current[key] === undefined || current[key] === null) {
-      current[key] = {};
-    }
-    current = current[key];
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
-export function getByPath(obj: any, path: string): any {
-  const parts = path.split('.');
-  let current = obj;
-  for (const part of parts) {
-    if (current === undefined || current === null) return undefined;
-    current = current[part];
-  }
-  return current;
-}
-
-export function deleteByPath(obj: any, path: string): void {
-  const parts = path.split('.');
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (current[parts[i]] === undefined) return;
-    current = current[parts[i]];
-  }
-  delete current[parts[parts.length - 1]];
-}
-
-// ===== 从 schema 生成默认表单数据 =====
-
+// 从字段 schema 创建默认表单数据
 export function createDefaultFormData(fields: FieldSchema[]): Record<string, any> {
   const data: Record<string, any> = {};
   for (const field of fields) {
     if (field.type === 'section') continue;
-    data[field.key] = JSON.parse(JSON.stringify(field.defaultValue));
+    data[field.key] = field.defaultValue;
   }
   return data;
 }
 
-// ===== 检查字段是否应该显示 =====
-
-export function shouldShowField(field: FieldSchema, data: Record<string, any>): boolean {
-  if (!field.showWhen) return true;
-  const depValue = data[field.showWhen.field];
-  if (field.showWhen.value === 'nonempty') {
-    return Array.isArray(depValue) ? depValue.length > 0 : !!depValue;
+// 设置嵌套对象路径上的值
+function setNestedValue(obj: Record<string, any>, path: string, value: any): void {
+  const parts = path.split('.');
+  let current = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
+      current[parts[i]] = {};
+    }
+    current = current[parts[i]];
   }
-  return depValue === field.showWhen.value;
+  current[parts[parts.length - 1]] = value;
 }
 
-// ===== 核心：从表单数据 + 模板生成 item JSON =====
+// 检查条件是否满足
+export function shouldShowField(field: FieldSchema, data: Record<string, any>): boolean {
+  if (!field.showWhen) return true;
+  return data[field.showWhen.field] === field.showWhen.value;
+}
 
-export async function generateItemJson(
-  module: ModuleDefinition,
-  item: ProjectItem,
-  subTypeId?: string,
-): Promise<any> {
-  // 确定子类型和字段
-  const subType = subTypeId ? module.subTypes?.find(s => s.id === subTypeId) : undefined;
-  const templateFile = subType?.templateFile || module.templateFile;
-  const fields = subType?.fields || module.fields;
+// 内部别名
+function checkCondition(field: FieldSchema, data: Record<string, any>): boolean {
+  return shouldShowField(field, data);
+}
 
-  // 加载模板
-  const response = await fetch(`${import.meta.env.BASE_URL}assets/${templateFile}`);
-  const template = await response.json();
-
-  // 深拷贝模板
-  const result = JSON.parse(JSON.stringify(template));
-  const itemDef = result['minecraft:item'];
-  const components = itemDef.components || (itemDef.components = {});
-
+// ===== 物品生成器 (weapon/armor/food/shield) =====
+function generateItem(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
   const data = item.data;
-  const namespace = 'pa'; // 默认命名空间
-  const identifier = `${namespace}:${data.identifier || 'change_me'}`;
+  const ns = 'pa'; // namespace
+  const identifier = `${ns}:${data.identifier || 'change_me'}`;
 
-  // 设置 identifier
-  setByPath(result, 'minecraft:item.description.identifier', identifier);
+  const result: Record<string, any> = {
+    format_version: '1.21.100',
+    'minecraft:item': {
+      description: {
+        identifier,
+        menu_category: {
+          category: data.menuCategory || 'none',
+        },
+      },
+      components: {} as Record<string, any>,
+    },
+  };
 
-  // 设置 display_name
-  if (data.displayName) {
-    components['minecraft:display_name'] = { value: `item.add:${namespace}_${data.identifier}.name` };
+  const components = result['minecraft:item'].components;
+
+  // 设置物品栏分组
+  if (data.itemGroup && data.itemGroup !== '') {
+    result['minecraft:item'].description.menu_category.group = data.itemGroup;
   }
 
-  // 设置 icon
-  if (data.icon) {
-    components['minecraft:icon'] = data.icon;
-  }
-
-  // 处理每个字段
-  for (const field of fields) {
+  // 遍历字段设置值
+  for (const field of module.fields) {
+    if (!checkCondition(field, data)) continue;
     if (field.type === 'section' || field.type === 'icon') continue;
-    if (!field.jsonPath) continue;
-    if (!shouldShowField(field, data)) {
-      deleteByPath(result, field.jsonPath);
-      continue;
-    }
 
     const value = data[field.key];
-    if (value === undefined || value === null) continue;
+    if (value === undefined || value === null || value === '') continue;
 
-    // 跳过空字符串（除非有特殊处理）
-    if (value === '' && field.type === 'text') {
-      deleteByPath(result, field.jsonPath);
-      continue;
-    }
+    // 特殊字段处理
+    if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup') continue;
 
-    // 特殊处理
-    if (field.key === 'repairableItems' && data.repairableEnable) {
-      if (Array.isArray(value) && value.length > 0) {
-        components['minecraft:repairable'] = {
-          repair_items: value.map((r: any) => ({
-            items: r.items,
-            repair_amount: r.repairAmount,
-          })),
-        };
-      }
-      continue;
+    // 使用 jsonPath 直接设置
+    if (field.jsonPath) {
+      const fullPath = `minecraft:item.${field.jsonPath}`;
+      setNestedValue(result, fullPath, value);
     }
-
-    if (field.key === 'canDestroy' && Array.isArray(value) && value.length > 0) {
-      components['minecraft:can_destroy'] = { blocks: value };
-      if (data.canDestroyInCreative !== undefined) {
-        components['minecraft:can_destroy_in_creative'] = data.canDestroyInCreative;
-      }
-      continue;
-    }
-
-    if (field.key === 'cooldown' && data.cooldownEnable) {
-      components['minecraft:cooldown'] = {
-        category: data.cooldownType || 'attack',
-        duration: value,
-      };
-      continue;
-    }
-
-    if (field.key === 'useAnimation' && value === '') {
-      deleteByPath(result, field.jsonPath);
-      continue;
-    }
-
-    // === 高级属性特殊处理 ===
-
-    // 药水效果
-    if (field.key === 'potionEffects' && data.potionEffectsEnable) {
-      if (Array.isArray(value) && value.length > 0) {
-        components['minecraft:food'] = components['minecraft:food'] || {};
-        components['minecraft:food'].on_consume = {
-          apply_effects_to_player: value.map((e: any) => ({
-            effect: e.effect,
-            amplifier: e.amplifier ?? 0,
-            duration: e.duration ?? 10,
-            visible: e.visible !== false,
-          })),
-        };
-      }
-      continue;
-    }
-
-    // 使用行为 (on_use 事件)
-    if (field.key === 'onUseEvent' && data.onUseEnable) {
-      components['minecraft:on_use'] = {
-        on_use: { event: value || 'on_use_event' },
-      };
-      continue;
-    }
-
-    // 使用函数
-    if (field.key === 'onUseFunc' && value) {
-      if (!components['minecraft:on_use']) {
-        components['minecraft:on_use'] = { on_use: {} };
-      }
-      components['minecraft:on_use'].on_use.function = value;
-      continue;
-    }
-
-    // 方块放置器
-    if (field.key === 'blockPlacerBlock' && data.blockPlacerEnable) {
-      components['minecraft:block_placer'] = {
-        block_reference: value || 'minecraft:stone',
-      };
-      continue;
-    }
-
-    // 实体放置器
-    if (field.key === 'entityPlacerEntity' && data.entityPlacerEnable) {
-      components['minecraft:entity_placer'] = {
-        entity_reference: value || 'minecraft:zombie',
-      };
-      continue;
-    }
-
-    // 武器命中事件
-    if (field.key === 'onHurtEntityEvent' && data.weaponHitEventEnable) {
-      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
-      components['minecraft:weapon'].on_hurt_entity = { event: value || 'on_hurt_entity_event' };
-      continue;
-    }
-    if (field.key === 'onNotHurtEntityEvent' && data.weaponHitEventEnable) {
-      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
-      components['minecraft:weapon'].on_not_hurt_entity = { event: value || 'on_not_hurt_entity_event' };
-      continue;
-    }
-    if (field.key === 'onHitBlockEvent' && data.weaponHitEventEnable) {
-      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
-      components['minecraft:weapon'].on_hit_block = { event: value || 'on_hit_block_event' };
-      continue;
-    }
-
-    // 使用修饰符
-    if (field.key === 'useDuration' && data.useModifiersEnable) {
-      components['minecraft:use_duration'] = value;
-      continue;
-    }
-    if (field.key === 'movementModifier' && data.useModifiersEnable) {
-      components['minecraft:use_modifiers'] = {
-        movement_modifier: value,
-      };
-      continue;
-    }
-
-    // 射击者
-    if (field.key === 'shooterAmmunition' && data.shooterEnable) {
-      components['minecraft:shooter'] = {
-        ammunition: [{ item: value || 'minecraft:arrow' }],
-        max_draw_duration: data.shooterMaxDrawDuration ?? 1.5,
-        scale_power_by_draw_duration: data.shooterScalePower !== false,
-      };
-      continue;
-    }
-    if (field.key === 'shooterMaxDrawDuration' && data.shooterEnable) {
-      // 已在 shooterAmmunition 中处理
-      continue;
-    }
-    if (field.key === 'shooterScalePower' && data.shooterEnable) {
-      // 已在 shooterAmmunition 中处理
-      continue;
-    }
-
-    // 耐火
-    if (field.key === 'fireResistant' && value === true) {
-      components['minecraft:fire_resistant'] = {};
-      continue;
-    }
-
-    // 稀有度
-    if (field.key === 'rarity' && value) {
-      components['minecraft:rarity'] = value;
-      continue;
-    }
-
-    // 穿透武器 / 动能武器（需脚本支持，添加 item tag）
-    if (field.key === 'piercingWeaponEnable' && value === true) {
-      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
-      // 标记为穿透武器，脚本可读取此 tag
-      const tags = itemDef.description?.tags || [];
-      if (!tags.includes('pa:piercing_weapon')) {
-        tags.push('pa:piercing_weapon');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags);
-      continue;
-    }
-    if (field.key === 'kineticWeaponEnable' && value === true) {
-      components['minecraft:weapon'] = components['minecraft:weapon'] || {};
-      // 标记为动能武器，脚本可读取此 tag
-      const tags = itemDef.description?.tags || [];
-      if (!tags.includes('pa:kinetic_weapon')) {
-        tags.push('pa:kinetic_weapon');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags);
-      continue;
-    }
-
-    // === 新增标准组件处理 ===
-
-    // 燃料 (minecraft:fuel)
-    if (field.key === 'fuelDuration' && data.fuelEnable) {
-      components['minecraft:fuel'] = { duration: value };
-      continue;
-    }
-
-    // 可投掷 (minecraft:throwable)
-    if (field.key === 'throwPower' && data.throwableEnable) {
-      components['minecraft:throwable'] = { throw_power: value };
-      continue;
-    }
-
-    // 使用方块限制 (minecraft:use_on)
-    if (field.key === 'useOnBlocks' && Array.isArray(value) && value.length > 0) {
-      components['minecraft:use_on'] = { blocks: value };
-      continue;
-    }
-
-    // 挖掘工具 (minecraft:digger)
-    if (field.key === 'diggerBlocks' && data.diggerEnable) {
-      if (Array.isArray(value) && value.length > 0) {
-        components['minecraft:digger'] = {
-          destroy_speeds: value.map((d: any) => ({
-            block: d.items?.[0] || d.items || 'minecraft:stone',
-            speed: d.repairAmount ?? 1,
-          })),
-        };
-      }
-      continue;
-    }
-
-    // 可穿戴 (minecraft:wearable)
-    if (field.key === 'wearableSlot' && data.wearableEnable) {
-      components['minecraft:wearable'] = { slot: value };
-      continue;
-    }
-
-    // 物品标签 (description.tags)
-    if (field.key === 'tags' && value) {
-      const tagList = value.split(',').map((t: string) => t.trim()).filter(Boolean);
-      const existingTags = itemDef.description?.tags || [];
-      for (const t of tagList) {
-        if (!existingTags.includes(t)) {
-          existingTags.push(t);
-        }
-      }
-      setByPath(result, 'minecraft:item.description.tags', existingTags);
-      continue;
-    }
-
-    // 可命名 (minecraft:nameable)
-    if (field.key === 'allowNameTagRenaming' && data.nameableEnable) {
-      components['minecraft:nameable'] = { allow_name_tag_renaming: value };
-      continue;
-    }
-
-    // 战利品表 (minecraft:loot)
-    if (field.key === 'lootTablePath' && data.lootEnable && value) {
-      components['minecraft:loot'] = { loot_table: value };
-      continue;
-    }
-
-    // === MAM 自定义/脚本属性（通过 item tag 标记，脚本读取） ===
-
-    // 掠夺附魔
-    if (field.key === 'lootingEnchantEnable' && value === true) {
-      const tags2 = itemDef.description?.tags || [];
-      if (!tags2.includes('pa:looting_enchant')) {
-        tags2.push('pa:looting_enchant');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags2);
-      continue;
-    }
-
-    // 伤害吸收
-    if (field.key === 'absorbableCauses' && data.damageAbsorptionEnable && value) {
-      const tags3 = itemDef.description?.tags || [];
-      if (!tags3.includes('pa:damage_absorption')) {
-        tags3.push('pa:damage_absorption');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags3);
-      components['minecraft:custom_components'] = components['minecraft:custom_components'] || [];
-      if (!components['minecraft:custom_components'].includes('pa:absorb_damage')) {
-        components['minecraft:custom_components'].push('pa:absorb_damage');
-      }
-      continue;
-    }
-
-    // 暴击粒子
-    if (field.key === 'critParticleOnHurt' && value === true) {
-      const tags4 = itemDef.description?.tags || [];
-      if (!tags4.includes('pa:crit_particle_on_hurt')) {
-        tags4.push('pa:crit_particle_on_hurt');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags4);
-      continue;
-    }
-
-    // 命中销毁
-    if (field.key === 'destroyOnHit' && value === true) {
-      const tags5 = itemDef.description?.tags || [];
-      if (!tags5.includes('pa:destroy_on_hit')) {
-        tags5.push('pa:destroy_on_hit');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags5);
-      continue;
-    }
-
-    // 反弹伤害
-    if (field.key === 'reflectOnHurt' && value === true) {
-      const tags6 = itemDef.description?.tags || [];
-      if (!tags6.includes('pa:reflect_on_hurt')) {
-        tags6.push('pa:reflect_on_hurt');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags6);
-      continue;
-    }
-
-    // 半随机差异伤害
-    if (field.key === 'semiRandomDiffDamage' && value === true) {
-      const tags7 = itemDef.description?.tags || [];
-      if (!tags7.includes('pa:semi_random_diff_damage')) {
-        tags7.push('pa:semi_random_diff_damage');
-      }
-      setByPath(result, 'minecraft:item.description.tags', tags7);
-      continue;
-    }
-
-    // 普通字段直接设置
-    setByPath(result, field.jsonPath, value);
   }
 
-  // 清理：移除空值组件
-  cleanupEmpty(result);
+  // --- 特殊组件处理 ---
+
+  // 附魔
+  if (data.enchantableEnable && data.enchantable !== undefined) {
+    components['minecraft:enchantable'] = {
+      value: data.enchantable,
+      slot: data.enchantableSlot || 'all',
+    };
+  }
+
+  // 可修复
+  if (data.repairableEnable && data.repairableItems?.length > 0) {
+    components['minecraft:repairable'] = {
+      repair_items: data.repairableItems.map((id: string) => ({ items: [id] })),
+    };
+  }
+
+  // 冷却
+  if (data.cooldownEnable && data.cooldown !== undefined) {
+    components['minecraft:cooldown'] = {
+      category: data.cooldownType || 'attack',
+      duration: data.cooldown,
+    };
+  }
+
+  // 燃料
+  if (data.fuelEnable && data.fuelDuration !== undefined) {
+    components['minecraft:fuel'] = { duration: data.fuelDuration };
+  }
+
+  // 可投掷
+  if (data.throwableEnable) {
+    components['minecraft:throwable'] = {
+      throw_power: data.throwPower || 1.5,
+      do_swing_animation: true,
+    };
+  }
+
+  // 可破坏方块
+  if (data.canDestroy?.length > 0) {
+    components['minecraft:digger'] = {
+      use_efficiency: true,
+      destroy_speeds: data.canDestroy.map((blockId: string) => ({
+        block: blockId,
+        speed: data.miningSpeed || 1,
+      })),
+    };
+  }
+
+  // 挖掘工具
+  if (data.diggerEnable && data.diggerBlocks?.length > 0) {
+    if (!components['minecraft:digger']) {
+      components['minecraft:digger'] = { use_efficiency: true, destroy_speeds: [] };
+    }
+    for (const block of data.diggerBlocks) {
+      components['minecraft:digger'].destroy_speeds.push({ block, speed: 6 });
+    }
+  }
+
+  // 药水效果
+  if (data.potionEffectsEnable && data.potionEffects?.length > 0) {
+    const effects: Record<string, any> = {};
+    for (const eff of data.potionEffects) {
+      effects[eff.effect] = {
+        duration: eff.duration,
+        amplifier: eff.amplifier || 0,
+      };
+    }
+    components['minecraft:food'] = components['minecraft:food'] || {};
+    components['minecraft:food'].on_consume = {
+      using_item: { condition: 'query.is_first_item', trigger: 'on_consume' },
+    };
+    // 食物效果通过 events 设置
+    result['minecraft:item'].events = result['minecraft:item'].events || {};
+    result['minecraft:item'].events.on_consume = {
+      run_command: { command: [] },
+      apply_effects_to_self: effects,
+    };
+  }
+
+  // 使用事件
+  if (data.onUseEnable && data.onUseEvent) {
+    result['minecraft:item'].events = result['minecraft:item'].events || {};
+    result['minecraft:item'].events[data.onUseEvent] = {};
+    components['minecraft:on_use'] = { trigger: data.onUseEvent };
+  }
+
+  // 方块放置器
+  if (data.blockPlacerEnable && data.blockPlacerBlock) {
+    components['minecraft:block_placer'] = { block_reference: data.blockPlacerBlock };
+  }
+
+  // 实体放置器
+  if (data.entityPlacerEnable && data.entityPlacerEntity) {
+    components['minecraft:entity_placer'] = { entity: data.entityPlacerEntity };
+  }
+
+  // 武器命中事件
+  if (data.weaponHitEventEnable) {
+    result['minecraft:item'].events = result['minecraft:item'].events || {};
+    if (data.onHurtEntityEvent) {
+      result['minecraft:item'].events[data.onHurtEntityEvent] = {};
+    }
+    if (data.onNotHurtEntityEvent) {
+      result['minecraft:item'].events[data.onNotHurtEntityEvent] = {};
+    }
+    if (data.onHitBlockEvent) {
+      result['minecraft:item'].events[data.onHitBlockEvent] = {};
+    }
+    components['minecraft:weapon'] = {
+      on_hurt_entity: data.onHurtEntityEvent,
+      on_not_hurt_entity: data.onNotHurtEntityEvent,
+      on_hit_block: data.onHitBlockEvent,
+    };
+  }
+
+  // 射击者
+  if (data.shooterEnable) {
+    components['minecraft:shooter'] = {
+      ammunition: [{ item: data.shooterAmmunition || 'minecraft:arrow', use_offhand: true, quantity: 1 }],
+      max_draw_duration: data.shooterMaxDrawDuration || 1.5,
+      scale_power_by_draw_duration: data.shooterScalePower !== false,
+    };
+  }
+
+  // 耐火
+  if (data.fireResistant) {
+    components['minecraft:fire_resistant'] = {};
+  }
+
+  // 标签
+  if (data.tags) {
+    const tags = data.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+    for (const tag of tags) {
+      components[`tag:${tag}`] = {};
+    }
+  }
+
+  // --- 食物特殊处理 ---
+  if (module.id === 'food') {
+    components['minecraft:food'] = components['minecraft:food'] || {};
+    components['minecraft:food'].nutrition = data.nutrition ?? 4;
+    components['minecraft:food'].saturation_modifier = data.saturation ?? 0.6;
+    if (data.canAlwaysEat) {
+      components['minecraft:food'].can_always_eat = true;
+    }
+    if (data.usingConvertsTo) {
+      components['minecraft:food'].using_converts_to = data.usingConvertsTo;
+    }
+    if (data.useDuration) {
+      components['minecraft:use_modifiers'] = {
+        use_duration: data.useDuration,
+        movement_modifier: 1,
+      };
+    }
+    if (data.compostableEnable && data.compostingChance !== undefined) {
+      components['minecraft:compostable'] = { composting_chance: data.compostingChance };
+    }
+  }
+
+  // --- 护甲特殊处理 ---
+  if (module.id === 'armor') {
+    const armorSlotMap: Record<string, string> = {
+      helmet: 'slot.armor.head',
+      chestplate: 'slot.armor.chest',
+      leggings: 'slot.armor.legs',
+      boots: 'slot.armor.feet',
+    };
+    const slot = armorSlotMap[data.armorType || 'helmet'] || 'slot.armor.head';
+    components['minecraft:wearable'] = { slot, protection: data.protection ?? 0 };
+    if (data.knockbackResistance) {
+      components['minecraft:wearable'].knockback_resistance = data.knockbackResistance;
+    }
+  }
+
+  // 清理空对象
+  if (Object.keys(result['minecraft:item'].events || {}).length === 0) {
+    delete result['minecraft:item'].events;
+  }
 
   return result;
 }
 
-// ===== 清理空值 =====
+// ===== 方块生成器 =====
+function generateBlock(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const identifier = `${ns}:${data.identifier || 'change_me'}`;
 
-function cleanupEmpty(obj: any): void {
-  if (typeof obj !== 'object' || obj === null) return;
-  for (const key of Object.keys(obj)) {
-    if (obj[key] === '' || obj[key] === null) {
-      delete obj[key];
-    } else if (typeof obj[key] === 'object') {
-      cleanupEmpty(obj[key]);
-      if (Object.keys(obj[key]).length === 0) {
-        delete obj[key];
+  const result: Record<string, any> = {
+    format_version: '1.21.100',
+    'minecraft:block': {
+      description: { identifier },
+      components: {} as Record<string, any>,
+      permutations: [],
+    },
+  };
+
+  const components = result['minecraft:block'].components;
+
+  // 遍历字段设置值
+  for (const field of module.fields) {
+    if (!checkCondition(field, data)) continue;
+    if (field.type === 'section' || field.type === 'icon') continue;
+    const value = data[field.key];
+    if (value === undefined || value === null || value === '') continue;
+    if (['identifier', 'displayName', 'blockType'].includes(field.key)) continue;
+    if (field.jsonPath) {
+      setNestedValue(result, `minecraft:block.${field.jsonPath}`, value);
+    }
+  }
+
+  // 材质
+  if (data.materialInstance) {
+    components['minecraft:material_instances'] = {
+      '*': { texture: data.materialInstance },
+    };
+  }
+
+  // 碰撞箱
+  if (data.collisionBoxEnable) {
+    components['minecraft:collision_box'] = {
+      origin: [-8, 0, -8],
+      size: [16, data.collisionHeight ?? 16, 16],
+    };
+  }
+
+  // 选区
+  if (data.selectionBoxEnable) {
+    components['minecraft:selection_box'] = {
+      origin: [-8, 0, -8],
+      size: [16, data.selectionHeight ?? 16, 16],
+    };
+  }
+
+  // 几何体
+  if (data.geometryEnable && data.geometry) {
+    components['minecraft:geometry'] = data.geometry;
+  }
+
+  // 光照
+  if (data.lightEmission !== undefined && data.lightEmission > 0) {
+    components['minecraft:light_emission'] = data.lightEmission;
+  }
+
+  // 可燃
+  if (data.flammableEnable) {
+    components['minecraft:flammable'] = {
+      flame_odds: data.flameOdds ?? 0,
+      burn_odds: data.burnOdds ?? 0,
+    };
+  }
+
+  // 红石
+  if (data.redstoneConductor === false) {
+    components['minecraft:breathable'] = { breathable: true };
+  }
+
+  // 可破坏
+  if (data.destroyTime !== undefined && data.destroyTime > 0) {
+    components['minecraft:destructible_by_mining'] = { seconds_to_destroy: data.destroyTime };
+  }
+
+  // 可爆炸
+  if (data.explosionResistance !== undefined && data.explosionResistance > 0) {
+    components['minecraft:destructible_by_explosion'] = { explosion_resistance: data.explosionResistance };
+  }
+
+  // 方块实体
+  if (data.blockEntityEnable) {
+    result['minecraft:block'].description.identifier = identifier;
+    result['minecraft:block'].components['minecraft:custom_components'] = [];
+  }
+
+  // 楼梯变体
+  if (data.blockType === 'stair') {
+    components['minecraft:geometry'] = 'minecraft:stairs';
+    components['minecraft:material_instances'] = {
+      '*': { texture: data.materialInstance || 'iron_block' },
+      'stairs': { texture: data.materialInstance || 'iron_block' },
+    };
+  }
+
+  // 门变体
+  if (data.blockType === 'door') {
+    components['minecraft:geometry'] = 'minecraft:geometry.full_block';
+    components['minecraft:custom_components'] = ['pa:door_behavior'];
+  }
+
+  // 栅栏变体
+  if (data.blockType === 'fence') {
+    components['minecraft:geometry'] = 'minecraft:fence';
+  }
+
+  // 栅栏门变体
+  if (data.blockType === 'fence_gate') {
+    components['minecraft:geometry'] = 'minecraft:fence_gate';
+  }
+
+  // 活板门变体
+  if (data.blockType === 'trapdoor') {
+    components['minecraft:geometry'] = 'minecraft:trapdoor';
+  }
+
+  // 墙变体
+  if (data.blockType === 'wall') {
+    components['minecraft:geometry'] = 'minecraft:wall';
+  }
+
+  return result;
+}
+
+// ===== 实体生成器 =====
+function generateEntity(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const identifier = `${ns}:${data.identifier || 'change_me'}`;
+
+  // 服务端实体定义
+  const serverEntity: Record<string, any> = {
+    format_version: '1.21.100',
+    'minecraft:entity': {
+      description: {
+        identifier,
+        is_summonable: true,
+        is_spawnable: data.isSpawnable !== false,
+        is_experimental: false,
+      },
+      component_groups: {},
+      components: {} as Record<string, any>,
+      events: {},
+    },
+  };
+
+  const components = serverEntity['minecraft:entity'].components;
+
+  // 遍历字段设置值
+  for (const field of module.fields) {
+    if (!checkCondition(field, data)) continue;
+    if (field.type === 'section' || field.type === 'icon') continue;
+    const value = data[field.key];
+    if (value === undefined || value === null || value === '') continue;
+    if (['identifier', 'displayName', 'entityType', 'isSpawnable'].includes(field.key)) continue;
+    if (field.jsonPath) {
+      setNestedValue(serverEntity, `minecraft:entity.${field.jsonPath}`, value);
+    }
+  }
+
+  // 类型属性
+  if (data.entityType === 'animal') {
+    components['minecraft:behavior.float'] = { priority: 0 };
+    components['minecraft:behavior.random_look_around'] = { priority: 7 };
+    components['minecraft:behavior.random_stroll'] = { priority: 6, speed_multiplier: 0.8 };
+    components['minecraft:behavior.look_at_player'] = { priority: 8, look_distance: 6.0 };
+    components['minecraft:physics'] = {};
+    components['minecraft:pushable'] = { is_pushable: true, is_pushable_by_piston: true };
+    components['minecraft:environment_sensor'] = {};
+    components['minecraft:jump.static'] = {};
+    components['minecraft:navigation.walk'] = { can_path_over_water: true };
+    components['minecraft:movement.basic'] = {};
+    components['minecraft:movement'] = { value: data.movementSpeed ?? 0.25 };
+    components['minecraft:health'] = { value: data.maxHealth ?? 20, max: data.maxHealth ?? 20 };
+    components['minecraft:attack'] = { damage: data.attackDamage ?? 0 };
+    components['minecraft:despawn'] = { despawn_from_distance: {} };
+  } else if (data.entityType === 'monster') {
+    components['minecraft:behavior.float'] = { priority: 0 };
+    components['minecraft:behavior.random_look_around'] = { priority: 7 };
+    components['minecraft:behavior.random_stroll'] = { priority: 6, speed_multiplier: 0.8 };
+    components['minecraft:behavior.look_at_player'] = { priority: 8, look_distance: 6.0 };
+    components['minecraft:behavior.hurt_by_target'] = { priority: 1 };
+    components['minecraft:behavior.nearest_attackable_target'] = {
+      priority: 2,
+      entity_types: [{ filters: { test: 'is_family', subject: 'other', value: 'player' }, max_dist: 16 }],
+      must_see: true,
+    };
+    components['minecraft:behavior.melee_attack'] = { priority: 3, speed_multiplier: 1.2, track_target: true };
+    components['minecraft:physics'] = {};
+    components['minecraft:pushable'] = { is_pushable: true, is_pushable_by_piston: true };
+    components['minecraft:jump.static'] = {};
+    components['minecraft:navigation.walk'] = { can_path_over_water: true };
+    components['minecraft:movement.basic'] = {};
+    components['minecraft:movement'] = { value: data.movementSpeed ?? 0.25 };
+    components['minecraft:health'] = { value: data.maxHealth ?? 20, max: data.maxHealth ?? 20 };
+    components['minecraft:attack'] = { damage: data.attackDamage ?? 2 };
+    components['minecraft:despawn'] = { despawn_from_distance: {} };
+    serverEntity['minecraft:entity'].description.properties = { family: { type: 'monster' } };
+  } else if (data.entityType === 'projectile') {
+    components['minecraft:projectile'] = {
+      on_hit: { impact_effect: { particle: 'minecraft:large_explosion', sound: 'minecraft:random.explode' } },
+      power: data.projectilePower ?? 2,
+      gravity: data.projectileGravity ?? 0.05,
+      anchor: 1,
+      offset: [0, 0.5, 0],
+      reflect_immovable: true,
+      catch_fire: false,
+    };
+    components['minecraft:physics'] = {};
+  }
+
+  // 碰撞箱
+  if (data.collisionBoxEnable) {
+    components['minecraft:collision_box'] = {
+      width: data.collisionWidth ?? 1,
+      height: data.collisionHeight ?? 1,
+    };
+  }
+
+  // 可骑乘
+  if (data.ridableEnable) {
+    components['minecraft:rideable'] = {
+      seat_count: 1,
+      family_types: ['player'],
+      seats: { position: [0, data.seatHeight ?? 1, 0] },
+    };
+    components['minecraft:behavior.player_ride_tamed'] = { priority: 0 };
+  }
+
+  // 可繁殖
+  if (data.breedableEnable) {
+    components['minecraft:is_breedable'] = {};
+    components['minecraft:behavior.breed'] = { priority: 4, speed_multiplier: 1.0 };
+    components['minecraft:behavior.tameable'] = { priority: 5, tame_items: [data.tameItem || 'minecraft:wheat'] };
+  }
+
+  // 掉落物
+  if (data.lootTableEnable && data.lootTable) {
+    components['minecraft:loot'] = { table: data.lootTable };
+  }
+
+  // 生成蛋
+  if (data.spawnEggEnable) {
+    serverEntity['minecraft:entity'].description.spawn_egg = {
+      base_color: data.spawnEggBaseColor ?? '#000000',
+      overlay_color: data.spawnEggOverlayColor ?? '#ffffff',
+    };
+  }
+
+  // 标签
+  if (data.tags) {
+    const tags = data.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+    for (const tag of tags) {
+      components[`tag:${tag}`] = {};
+    }
+  }
+
+  return serverEntity;
+}
+
+// ===== 群系生成器 =====
+function generateBiome(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const identifier = data.identifier || 'change_me';
+
+  const result: Record<string, any> = {
+    format_version: '1.21.110',
+    'minecraft:biome': {
+      description: { identifier },
+      components: {} as Record<string, any>,
+    },
+  };
+
+  const components = result['minecraft:biome'].components;
+
+  // 遍历字段设置值
+  for (const field of module.fields) {
+    if (!checkCondition(field, data)) continue;
+    if (field.type === 'section' || field.type === 'icon') continue;
+    const value = data[field.key];
+    if (value === undefined || value === null || value === '') continue;
+    if (['identifier', 'displayName', 'biomeType'].includes(field.key)) continue;
+    if (field.jsonPath) {
+      setNestedValue(result, `minecraft:biome.${field.jsonPath}`, value);
+    }
+  }
+
+  // 群系类型预设
+  const biomePresets: Record<string, any> = {
+    plains: {
+      'minecraft:overworld_generation': {},
+      'minecraft:climate': { temperature: 0.8, downfall: 0.4 },
+      'minecraft:overworld_height': { noise_type: 'default' },
+      'minecraft:surface_parameters': {
+        sea_floor_depth: 1,
+        sea_floor_material: 'minecraft:stone',
+        foundation_material: 'minecraft:stone',
+        mid_material: 'minecraft:dirt',
+        top_material: 'minecraft:grass',
+      },
+    },
+    desert: {
+      'minecraft:overworld_generation': {},
+      'minecraft:climate': { temperature: 2.0, downfall: 0.0 },
+      'minecraft:overworld_height': { noise_type: 'default' },
+      'minecraft:surface_parameters': {
+        sea_floor_depth: 1,
+        sea_floor_material: 'minecraft:sandstone',
+        foundation_material: 'minecraft:stone',
+        mid_material: 'minecraft:sandstone',
+        top_material: 'minecraft:sand',
+      },
+    },
+    snowy: {
+      'minecraft:overworld_generation': {},
+      'minecraft:climate': { temperature: 0.0, downfall: 0.5 },
+      'minecraft:overworld_height': { noise_type: 'default' },
+      'minecraft:surface_parameters': {
+        sea_floor_depth: 1,
+        sea_floor_material: 'minecraft:stone',
+        foundation_material: 'minecraft:stone',
+        mid_material: 'minecraft:dirt',
+        top_material: 'minecraft:snow_block',
+      },
+    },
+    ocean: {
+      'minecraft:overworld_generation': {},
+      'minecraft:climate': { temperature: 0.5, downfall: 0.5 },
+      'minecraft:overworld_height': { noise_type: 'ocean' },
+      'minecraft:surface_parameters': {
+        sea_floor_depth: 1,
+        sea_floor_material: 'minecraft:gravel',
+        foundation_material: 'minecraft:stone',
+        mid_material: 'minecraft:dirt',
+        top_material: 'minecraft:gravel',
+      },
+    },
+    mountain: {
+      'minecraft:overworld_generation': {},
+      'minecraft:climate': { temperature: 0.2, downfall: 0.3 },
+      'minecraft:overworld_height': { noise_type: 'mountain' },
+      'minecraft:surface_parameters': {
+        sea_floor_depth: 1,
+        sea_floor_material: 'minecraft:stone',
+        foundation_material: 'minecraft:stone',
+        mid_material: 'minecraft:stone',
+        top_material: 'minecraft:stone',
+      },
+    },
+    nether: {
+      'minecraft:nether_generation': {},
+      'minecraft:climate': { temperature: 2.0, downfall: 0.0 },
+      'minecraft:surface_parameters': {
+        sea_floor_material: 'minecraft:netherrack',
+        foundation_material: 'minecraft:netherrack',
+        mid_material: 'minecraft:netherrack',
+        top_material: 'minecraft:netherrack',
+      },
+    },
+    end: {
+      'minecraft:the_end_generation': {},
+      'minecraft:climate': { temperature: 0.5, downfall: 0.5 },
+    },
+  };
+
+  const preset = biomePresets[data.biomeType || 'plains'];
+  if (preset) {
+    Object.assign(components, preset);
+  }
+
+  // 自定义覆盖
+  if (data.temperature !== undefined) {
+    components['minecraft:climate'] = components['minecraft:climate'] || {};
+    components['minecraft:climate'].temperature = data.temperature;
+  }
+  if (data.downfall !== undefined) {
+    components['minecraft:climate'] = components['minecraft:climate'] || {};
+    components['minecraft:climate'].downfall = data.downfall;
+  }
+
+  // 标签
+  if (data.tags) {
+    const tags = data.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+    for (const tag of tags) {
+      components[`tag:${tag}`] = {};
+    }
+  }
+
+  return result;
+}
+
+// ===== 配方生成器 =====
+function generateRecipe(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const identifier = `${ns}:${data.identifier || 'change_me'}`;
+  const recipeType = data.recipeType || 'shaped';
+
+  // 有序合成
+  if (recipeType === 'shaped') {
+    const pattern = (data.pattern || ['', '', '']).filter((row: string) => row.length > 0);
+    const ingredientMap: Record<string, any> = {};
+    const ingredients = data.ingredients || {};
+    for (const [key, itemId] of Object.entries(ingredients)) {
+      if (key && itemId) {
+        ingredientMap[key] = { item: itemId as string };
       }
     }
+
+    return {
+      format_version: '1.21.100',
+      'minecraft:recipe_shaped': {
+        description: { identifier },
+        tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()) : ['crafting_table'],
+        pattern,
+        key: ingredientMap,
+        result: { item: data.resultItem || 'minecraft:diamond', count: data.resultCount ?? 1 },
+        unlock: data.unlockEnable && data.unlockItems?.length > 0
+          ? { context: 'AlwaysUnlocked' }
+          : undefined,
+      },
+    };
+  }
+
+  // 无序合成
+  if (recipeType === 'shapeless') {
+    const items = (data.shapelessItems || []).map((id: string) => ({ item: id }));
+    return {
+      format_version: '1.21.100',
+      'minecraft:recipe_shapeless': {
+        description: { identifier },
+        tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()) : ['crafting_table'],
+        ingredients: items,
+        result: { item: data.resultItem || 'minecraft:diamond', count: data.resultCount ?? 1 },
+        unlock: data.unlockEnable && data.unlockItems?.length > 0
+          ? { context: 'AlwaysUnlocked' }
+          : undefined,
+      },
+    };
+  }
+
+  // 熔炼
+  if (recipeType === 'furnace') {
+    const furnaceKey = `minecraft:recipe_furnace`;
+    const tag = data.furnaceType || 'furnace';
+    const tagMap: Record<string, string> = {
+      furnace: 'furnace',
+      blast_furnace: 'blast_furnace',
+      smoker: 'smoker',
+      campfire: 'campfire',
+    };
+    return {
+      format_version: '1.21.100',
+      [furnaceKey]: {
+        description: { identifier },
+        tags: [tagMap[tag] || 'furnace'],
+        input: data.furnaceInput || 'minecraft:iron_ore',
+        output: data.resultItem || 'minecraft:iron_ingot',
+      },
+    };
+  }
+
+  return { format_version: '1.21.100' };
+}
+
+// ===== 主生成函数 =====
+export function generateItemJSON(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  switch (module.id) {
+    case 'weapon':
+    case 'armor':
+    case 'food':
+      return generateItem(module, item);
+    case 'block':
+      return generateBlock(module, item);
+    case 'entity':
+      return generateEntity(module, item);
+    case 'biome':
+      return generateBiome(module, item);
+    case 'recipe':
+      return generateRecipe(module, item);
+    default:
+      return generateItem(module, item);
   }
 }
 
-// ===== 生成辅助文件 =====
+// 生成客户端实体定义（实体需要额外文件）
+export function generateClientEntity(item: ProjectItem): Record<string, any> | null {
+  const data = item.data;
+  const ns = 'pa';
+  const identifier = `${ns}:${data.identifier || 'change_me'}`;
 
-export function generateItemTextureEntry(item: ProjectItem, namespace = 'pa'): { textureName: string; texturePath: string } {
-  const id = item.data.identifier || 'change_me';
-  const textureName = item.data.icon || `${namespace}_${id}`;
+  if (!data.geometry && !data.texture) return null;
+
   return {
-    textureName,
-    texturePath: `textures/items/${textureName}`,
+    format_version: '1.21.100',
+    'minecraft:client_entity': {
+      description: {
+        identifier,
+        materials: { default: 'entity_alphatest' },
+        textures: { default: data.texture || 'textures/entity/custom' },
+        geometry: { default: data.geometry || 'geometry.custom' },
+        render_controllers: ['controller.render.default'],
+        spawn_egg: data.spawnEggEnable ? {
+          base_color: data.spawnEggBaseColor ?? '#000000',
+          overlay_color: data.spawnEggOverlayColor ?? '#ffffff',
+        } : undefined,
+      },
+    },
   };
 }
 
-export function generateLangEntry(item: ProjectItem, namespace = 'pa'): string {
-  const id = item.data.identifier || 'change_me';
-  const name = item.data.displayName || id;
-  return `item.add:${namespace}_${id}.name=${name}`;
+// 生成单个项目的预览 JSON
+export function generatePreviewJSON(module: ModuleDefinition, item: ProjectItem): string {
+  const json = generateItemJSON(module, item);
+  return JSON.stringify(json, null, 2);
 }

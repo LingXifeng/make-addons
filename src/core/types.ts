@@ -13,6 +13,10 @@ export type FieldType =
   | 'itemList'    // 物品多选
   | 'repairItems' // 可修复物品列表
   | 'potionEffects' // 药水效果列表
+  | 'stringList'  // 字符串列表（标签等）
+  | 'recipePattern' // 配方图案网格
+  | 'recipeItems'   // 配方物品映射
+  | 'color'       // 颜色选择器
   | 'section';    // 分组标题
 
 export interface SelectOption {
@@ -47,30 +51,64 @@ export interface FieldSchema {
 
 // ===== 模块定义 =====
 
+// 模块类别（对应 HomeCategory）
+export type ModuleCategory =
+  | 'custom_items'       // 自定义物品
+  | 'custom_entities'    // 自定义实体
+  | 'custom_environment' // 自定义环境
+  | 'custom_recipes';    // 自定义配方
+
+// JSON 根键类型
+export type JsonRootKey =
+  | 'minecraft:item'
+  | 'minecraft:block'
+  | 'minecraft:entity'
+  | 'minecraft:biome'
+  | 'minecraft:recipe_shaped'
+  | 'minecraft:recipe_shapeless'
+  | 'minecraft:recipe_furnace';
+
+// 生成器类型
+export type GeneratorType =
+  | 'weapon' | 'armor' | 'food' | 'shield' | 'bow' | 'crossbow' | 'arrow' | 'mace'
+  | 'block' | 'block_model' | 'block_slab' | 'block_stair' | 'block_fence' | 'block_wall'
+  | 'block_door' | 'block_trapdoor' | 'block_fence_gate' | 'block_crop' | 'block_sapling'
+  | 'block_layer' | 'block_transparent' | 'block_fluid'
+  | 'entity' | 'biome'
+  | 'recipe_shaped' | 'recipe_shapeless' | 'recipe_furnace';
+
+export interface SubType {
+  id: string;
+  name: string;
+  templateFile: string;
+  fields?: FieldSchema[];
+}
+
 export interface ModuleDefinition {
   id: string;
   name: string;          // 中文名
-  icon: string;          // 模块图标 emoji 或路径
+  icon: string;          // 模块图标 emoji
+  category: ModuleCategory;
   templateFile: string;  // 模板文件路径 (相对于 public/assets/)
-  iconDir: string;       // 图标目录 (相对于 public/assets/icons/)
+  iconDir: string;       // 图标目录
   fields: FieldSchema[]; // 字段定义
-  // 子类型（如 Armor 有4件套）
-  subTypes?: { id: string; name: string; templateFile: string; fields?: FieldSchema[] }[];
-  // 生成器函数名
-  generatorType: 'weapon' | 'armor' | 'food' | 'shield' | 'bow' | 'crossbow' | 'arrow' | 'mace';
+  jsonRootKey: JsonRootKey; // JSON 根键
+  generatorType: GeneratorType;
+  // 子类型
+  subTypes?: SubType[];
 }
 
 // ===== 项目状态 =====
 
 export interface ProjectItem {
-  id: string;            // 唯一ID
-  moduleId: string;      // 模块ID
-  subTypeId?: string;    // 子类型ID
-  name: string;          // 用户给物品起的名字
-  data: Record<string, any>; // 表单数据
-  customTexture?: {      // 自定义上传的纹理
+  id: string;
+  moduleId: string;
+  subTypeId?: string;
+  name: string;
+  data: Record<string, any>;
+  customTexture?: {
     name: string;
-    dataUrl: string;     // base64 data URL
+    dataUrl: string;
   };
   createdAt: number;
 }
@@ -78,14 +116,19 @@ export interface ProjectItem {
 export interface Project {
   name: string;
   description: string;
-  namespace: string;     // 默认命名空间
-  items: ProjectItem[];
+  namespace: string;
+  items: Record<string, ProjectItem[]>; // keyed by module id
+  // UUIDs for manifests (generated on first export)
+  headerUUID?: string;
+  moduleUUID?: string;
+  resourceHeaderUUID?: string;
+  resourceModuleUUID?: string;
 }
 
 // ===== 导出相关 =====
 
 export interface ExportFile {
-  path: string;          // 相对于包根目录的路径
+  path: string;
   content: string | Uint8Array;
 }
 
