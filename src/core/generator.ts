@@ -142,7 +142,7 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
 
   // 药水效果
   // 食物：通过 on_consume 事件在食用时触发
-  // 装备/武器：不在此处理，由导出器生成脚本实现持续生效（手持/穿戴时一直有效）
+  // 装备/武器：通过 effect_manager.js 脚本持续生效，物品 JSON 中添加标记标签
   if (module.id === 'food' && data.potionEffectsEnable && data.potionEffects?.length > 0) {
     const effects: Record<string, any> = {};
     for (const eff of data.potionEffects) {
@@ -161,6 +161,12 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
       run_command: { command: [] },
       apply_effects_to_self: effects,
     };
+  }
+
+  // 装备/武器药水效果：在物品 JSON 中添加标记标签
+  if ((module.id === 'weapon' || module.id === 'armor') && data.potionEffectsEnable && data.potionEffects?.length > 0) {
+    const existingTags = components['minecraft:tags']?.tags || [];
+    components['minecraft:tags'] = { tags: [...existingTags, 'pa:has_continuous_effects'] };
   }
 
   // 使用函数
