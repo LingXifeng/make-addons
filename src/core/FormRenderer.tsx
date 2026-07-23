@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { FieldSchema } from '../core/types';
 import { shouldShowField } from '../core/generator';
 

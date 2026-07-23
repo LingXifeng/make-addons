@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, ProjectItem, ModuleDefinition } from '../core/types';
+import type { Project, ProjectItem } from '../core/types';
 import { createDefaultFormData } from '../core/generator';
 import { getModuleById } from '../modules';
 

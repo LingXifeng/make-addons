@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import type { ModuleDefinition, ProjectItem, ExportFile } from './types';
+import type { ProjectItem } from './types';
 import { generateItemJson, generateItemTextureEntry, generateLangEntry } from './generator';
 import { getModuleById } from '../modules';
 
@@ -28,7 +28,6 @@ export async function generateAddon(project: { name: string; namespace: string; 
   rp.file('manifest.json', JSON.stringify(rpManifest, null, 2));
   fileCount++;
 
-  const rpItems = rp.folder('items')!;
   const rpTextures = rp.folder('textures')!.folder('items')!;
   const rpLang = rp.folder('texts')!;
 
@@ -143,7 +142,7 @@ function uuid(): string {
   });
 }
 
-function createBehaviorManifest(name: string, namespace: string, bpUuid: string, rpUuid: string): any {
+function createBehaviorManifest(name: string, _namespace: string, bpUuid: string, rpUuid: string): any {
   return {
     format_version: 2,
     header: {
@@ -169,7 +168,7 @@ function createBehaviorManifest(name: string, namespace: string, bpUuid: string,
   };
 }
 
-function createResourceManifest(name: string, namespace: string, rpUuid: string, bpUuid: string): any {
+function createResourceManifest(name: string, _namespace: string, rpUuid: string, bpUuid: string): any {
   return {
     format_version: 2,
     header: {
@@ -197,7 +196,7 @@ function createResourceManifest(name: string, namespace: string, rpUuid: string,
 
 // ===== Attachable 生成 =====
 
-function generateAttachable(namespace: string, id: string, type: string): any {
+function generateAttachable(namespace: string, id: string, _type: string): any {
   const identifier = `${namespace}:${id}`;
   return {
     format_version: '1.10.0',
