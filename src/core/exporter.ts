@@ -8,6 +8,22 @@ interface AddonFile {
   path: string;
   content: string;
   isBase64?: boolean; // 贴图等二进制文件用 base64 字符串
+  iconFetch?: { iconDir: string; icon_name: string }; // 需要异步 fetch 的内置图标
+}
+
+// 需要贴图的模块 — 基础物品（minecraft:icon = identifier）
+const BASIC_TEXTURE_MODULES = ['weapon', 'armor', 'food', 'tool', 'normal', 'spawn_egg'];
+// 需要贴图的模块 — 自定义物品（minecraft:icon = { texture: data.icon }）
+const CUSTOM_TEXTURE_MODULES = ['bow', 'crossbow', 'shield', 'mace', 'arrow', 'music_disc', 'bundle', 'recall_item', 'soul_stone'];
+const ALL_TEXTURE_MODULES = [...BASIC_TEXTURE_MODULES, ...CUSTOM_TEXTURE_MODULES];
+
+// 获取物品的贴图 key（item_texture.json 中的键名）
+function getTextureKey(module: ModuleDefinition, item: ProjectItem): string {
+  const id = item.data.identifier || 'change_me';
+  if (CUSTOM_TEXTURE_MODULES.includes(module.id)) {
+    return item.data.icon || id;
+  }
+  return id;
 }
 
 // 生成 UUID
@@ -165,19 +181,34 @@ function getItemFilePath(module: ModuleDefinition, item: ProjectItem): { behavio
 // 收集装备/武器的持续药水效果
 interface ContinuousEffectEntry {
   itemId: string;       // pa:xxx
+  location: string;     // slot.weapon.mainhand, slot.armor.head 等
   effects: { effect: string; duration: number; amplifier: number; visible: boolean }[];
 }
 
 function collectContinuousEffects(items: { module: ModuleDefinition; item: ProjectItem }[]): ContinuousEffectEntry[] {
   const entries: ContinuousEffectEntry[] = [];
   for (const { module, item } of items) {
-    // 只对 weapon / armor 生成持续效果脚本，food 走 on_consume
+    // 只对 weapon / armor 生成持续效果，food 走 on_consume
     if (module.id !== 'weapon' && module.id !== 'armor') continue;
     const data = item.data;
     if (!data.potionEffectsEnable || !data.potionEffects?.length) continue;
     const id = `pa:${data.identifier || 'change_me'}`;
+
+    // 确定槽位
+    let location = 'slot.weapon.mainhand';
+    if (module.id === 'armor') {
+      const armorSlotMap: Record<string, string> = {
+        helmet: 'slot.armor.head',
+        chestplate: 'slot.armor.chest',
+        leggings: 'slot.armor.legs',
+        boots: 'slot.armor.feet',
+      };
+      location = armorSlotMap[data.armorType || 'helmet'] || 'slot.armor.head';
+    }
+
     entries.push({
       itemId: id,
+      location,
       effects: data.potionEffects.map((e: any) => ({
         effect: e.effect,
         duration: e.duration,
@@ -207,71 +238,49 @@ function collectFireAspectItems(items: { module: ModuleDefinition; item: Project
   return entries;
 }
 
-// 生成持续药水效果脚本
-function generateEffectScript(entries: ContinuousEffectEntry[], fireAspectEntries: FireAspectEntry[] = []): string {
-  const effectMap = entries.map(e => {
-    const effectsStr = e.effects.map(ef =>
-      `    "${ef.effect}": { duration: ${(ef.duration || 10) + 3}, amplifier: ${ef.amplifier || 0}, showParticles: ${ef.visible} }`
-    ).join(',\n');
-    return `  "${e.itemId}": {\n${effectsStr}\n  }`;
-  }).join(',\n');
+// 生成持续药水效果的 mcfunction 文件（替代脚本方案，每 tick 执行无缝刷新）
+function generateEffectMcfunctions(entries: ContinuousEffectEntry[]): { files: AddonFile[]; tickValues: string[] } {
+  const files: AddonFile[] = [];
+  const tickValues: string[] = [];
+
+  for (const entry of entries) {
+    const itemId = entry.itemId; // e.g., "pa:fire_sword"
+    const funcName = `${itemId.replace(':', '_')}_effect`; // e.g., "pa_fire_sword_effect"
+    const funcRef = `pa:${funcName}`;
+
+    // 生成命令 — 每 tick 执行，duration=1 保证无缝刷新
+    const lines: string[] = [`# ${funcRef} — 由 Make Addons 生成（每 tick 执行）`];
+    for (const eff of entry.effects) {
+      const hideParticles = eff.visible ? 'false' : 'true';
+      lines.push(`effect @e[hasitem={item=${itemId},location=${entry.location}}] ${eff.effect} 1 ${eff.amplifier || 0} ${hideParticles}`);
+    }
+
+    files.push({
+      path: `behavior_pack/functions/pa/${funcName}.mcfunction`,
+      content: lines.join('\n') + '\n',
+    });
+    tickValues.push(funcRef);
+  }
+
+  return { files, tickValues };
+}
+
+// 生成火焰附加脚本（事件驱动，无闪烁问题，保留脚本方案）
+function generateFireAspectScript(fireAspectEntries: FireAspectEntry[]): string {
+  if (fireAspectEntries.length === 0) return '';
 
   const fireAspectMap = fireAspectEntries.map(e =>
     `  "${e.itemId}": ${e.seconds}`
   ).join(',\n');
 
-  const hasEffects = entries.length > 0;
-  const hasFireAspect = fireAspectEntries.length > 0;
+  return `// 火焰附加脚本 — 由 Make Addons 生成
+// 攻击生物时使其着火（事件驱动，无闪烁）
+import { world, system, EquipmentSlot } from "@minecraft/server";
 
-  // 持续效果部分
-  const effectScript = hasEffects ? `
-const EFFECT_MAP = {
-${effectMap}
-};
-
-// 每 20 tick (1秒) 检查一次
-system.runInterval(() => {
-  for (const player of world.getAllPlayers()) {
-    try {
-      const equippable = player.getComponent("minecraft:equippable");
-      if (!equippable) continue;
-      // 检查主手
-      const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();
-      if (mainHand && EFFECT_MAP[mainHand.typeId]) {
-        applyEffects(player, EFFECT_MAP[mainHand.typeId]);
-      }
-      // 检查装备栏 (头盔/胸甲/护腿/靴子)
-      for (const slot of [EquipmentSlot.Head, EquipmentSlot.Chest, EquipmentSlot.Legs, EquipmentSlot.Feet]) {
-        try {
-          const item = equippable.getEquipmentSlot(slot).getItem();
-          if (item && EFFECT_MAP[item.typeId]) {
-            applyEffects(player, EFFECT_MAP[item.typeId]);
-          }
-        } catch {}
-      }
-    } catch {}
-  }
-}, 20);
-
-function applyEffects(player, effects) {
-  for (const [effectId, opts] of Object.entries(effects)) {
-    try {
-      player.addEffect(effectId, opts.duration, {
-        amplifier: opts.amplifier,
-        showParticles: opts.showParticles,
-      });
-    } catch {}
-  }
-}
-` : '';
-
-  // 火焰附加部分
-  const fireAspectScript = hasFireAspect ? `
 const FIRE_ASPECT_MAP = {
 ${fireAspectMap}
 };
 
-// 监听实体受伤事件 — 攻击者手持火焰附加武器时点燃被攻击者
 world.afterEvents.entityHurt.subscribe((event) => {
   try {
     const attacker = event.damageSource.damagingEntity;
@@ -289,15 +298,7 @@ world.afterEvents.entityHurt.subscribe((event) => {
     }
   } catch {}
 });
-` : '';
-
-  const parts = ['// 脚本 — 由 Make Addons 生成'];
-  if (hasEffects) parts.push('// 持续药水效果：装备/武器上的药水效果在手持或穿戴时持续生效');
-  if (hasFireAspect) parts.push('// 火焰附加：攻击生物时使其着火');
-  parts.push('import { world, system, EquipmentSlot } from "@minecraft/server";');
-  parts.push(effectScript + fireAspectScript);
-
-  return parts.join('\n');
+`;
 }
 
 // 生成合成配方 JSON
@@ -443,10 +444,10 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     }
   }
 
-  // 检查是否需要脚本模块（装备/武器有药水效果 或 火焰附加）
+  // 检查是否需要脚本模块（火焰附加需要事件监听脚本；持续药水效果改用 mcfunction）
   const continuousEffects = collectContinuousEffects(allItems);
   const fireAspectItems = collectFireAspectItems(allItems);
-  const hasScript = continuousEffects.length > 0 || fireAspectItems.length > 0 || allItems.some(({ module }) => module.id === 'script');
+  const hasScript = fireAspectItems.length > 0 || allItems.some(({ module }) => module.id === 'script');
 
   // 行为包 manifest
   files.push({
@@ -459,6 +460,9 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     path: 'resource_pack/manifest.json',
     content: generateResourceManifest(p),
   });
+
+  // 收集 tick.json 函数列表（函数模块 + 持续效果 mcfunction）
+  const tickValues: string[] = [];
 
   // 生成每个项目的 JSON 文件
   for (const { module, item } of allItems) {
@@ -473,12 +477,9 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
           content: item.data.commands || '',
         });
       }
-      // tick/load 函数
+      // tick/load 函数 — 收集到 tickValues 统一生成 tick.json
       if (item.data.tickEnabled) {
-        files.push({
-          path: `behavior_pack/functions/tick.json`,
-          content: JSON.stringify({ values: [`pa:${item.data.identifier || 'change_me'}`] }, null, 2),
-        });
+        tickValues.push(`pa:${item.data.identifier || 'change_me'}`);
       }
       if (item.data.loadEnabled) {
         files.push({
@@ -550,15 +551,15 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
 
   // 贴图文件 + item_texture.json 映射
   const textureItems = allItems.filter(({ module }) =>
-    ['weapon', 'armor', 'food', 'tool', 'normal', 'block', 'spawn_egg'].includes(module.id)
+    ALL_TEXTURE_MODULES.includes(module.id)
   );
 
   if (textureItems.length > 0) {
     // 生成 item_texture.json
     const textureData: Record<string, { textures: string }> = {};
-    for (const { item } of textureItems) {
-      const id = item.data.identifier || 'change_me';
-      textureData[id] = { textures: `textures/items/${id}` };
+    for (const { module, item } of textureItems) {
+      const texKey = getTextureKey(module, item);
+      textureData[texKey] = { textures: `textures/items/${texKey}` };
     }
     files.push({
       path: 'resource_pack/textures/item_texture.json',
@@ -569,19 +570,30 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
       }, null, 2),
     });
 
-    // 导出自定义贴图 PNG
-    for (const { item } of textureItems) {
+    // 导出贴图 PNG（自定义上传 或 内置图标）
+    for (const { module, item } of textureItems) {
+      const texKey = getTextureKey(module, item);
+
       if (item.customTexture?.dataUrl) {
-        const id = item.data.identifier || 'change_me';
-        // 从 data URL 提取 base64 数据
+        // 用户上传的自定义贴图
         const base64Match = item.customTexture.dataUrl.match(/^data:[^;]+;base64,(.+)$/);
         if (base64Match) {
           files.push({
-            path: `resource_pack/textures/items/${id}.png`,
+            path: `resource_pack/textures/items/${texKey}.png`,
             content: base64Match[1],
             isBase64: true,
           });
         }
+      } else {
+        // 内置图标 — 标记为需要异步 fetch
+        const iconName = CUSTOM_TEXTURE_MODULES.includes(module.id)
+          ? (item.data.icon || texKey)
+          : (item.data.icon || texKey);
+        files.push({
+          path: `resource_pack/textures/items/${texKey}.png`,
+          content: '',
+          iconFetch: { iconDir: module.iconDir, icon_name: iconName },
+        });
       }
     }
   }
@@ -603,11 +615,26 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     });
   }
 
-  // 持续药水效果脚本 + 火焰附加脚本 (装备/武器)
-  if (continuousEffects.length > 0 || fireAspectItems.length > 0) {
+  // 持续药水效果 — 生成 .mcfunction 文件 + tick.json（每 tick 执行，无缝刷新）
+  if (continuousEffects.length > 0) {
+    const { files: mcfnFiles, tickValues: effectTickValues } = generateEffectMcfunctions(continuousEffects);
+    files.push(...mcfnFiles);
+    tickValues.push(...effectTickValues);
+  }
+
+  // 火焰附加脚本（事件驱动，无闪烁问题）
+  if (fireAspectItems.length > 0) {
     files.push({
       path: 'behavior_pack/scripts/effect_manager.js',
-      content: generateEffectScript(continuousEffects, fireAspectItems),
+      content: generateFireAspectScript(fireAspectItems),
+    });
+  }
+
+  // tick.json — 合并所有需要每 tick 执行的函数
+  if (tickValues.length > 0) {
+    files.push({
+      path: 'behavior_pack/functions/tick.json',
+      content: JSON.stringify({ values: tickValues }, null, 2),
     });
   }
 
@@ -640,6 +667,22 @@ export async function exportAsMcaddon(project: Project, modules: ModuleDefinitio
       }
     } else if (file.path.startsWith('resource_pack/')) {
       const relPath = file.path.replace('resource_pack/', '');
+
+      // 异步 fetch 内置图标 PNG
+      if (file.iconFetch && !file.content) {
+        try {
+          const iconUrl = `${import.meta.env.BASE_URL}assets/icons/${file.iconFetch.iconDir}/${file.iconFetch.icon_name}.png`;
+          const resp = await fetch(iconUrl);
+          if (resp.ok) {
+            const arrayBuffer = await resp.arrayBuffer();
+            resourceFolder.file(relPath, arrayBuffer);
+          }
+        } catch {
+          // 图标 fetch 失败时跳过，不影响其他文件
+        }
+        continue;
+      }
+
       if (relPath && file.content) {
         resourceFolder.file(relPath, file.content, file.isBase64 ? { base64: true } : undefined);
       }

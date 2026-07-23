@@ -168,17 +168,10 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     };
   }
 
-  // 装备/武器药水效果：在物品 JSON 中添加标记标签
-  if ((module.id === 'weapon' || module.id === 'armor') && data.potionEffectsEnable && data.potionEffects?.length > 0) {
-    const existingTags = components['minecraft:tags']?.tags || [];
-    components['minecraft:tags'] = { tags: [...existingTags, 'pa:has_continuous_effects'] };
-  }
+  // 装备/武器药水效果：通过 mcfunction + tick.json 实现，无需标记标签
+  // （mcfunction 使用 @e[hasitem=...] 选择器直接检测物品）
 
-  // 火焰附加：打上标记标签，由脚本在攻击时点燃生物
-  if ((module.id === 'weapon' || module.id === 'tool') && data.fireAspectEnable) {
-    const existingTags = components['minecraft:tags']?.tags || [];
-    components['minecraft:tags'] = { tags: [...existingTags, 'pa:fire_aspect'] };
-  }
+  // 火焰附加：由脚本在攻击时点燃生物（事件驱动，无需标记标签）
 
   // 使用函数
   if (data.useFunctionEnable && data.useFunctionValue) {
