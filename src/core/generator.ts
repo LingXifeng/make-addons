@@ -83,6 +83,10 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
 
   // --- 特殊组件处理 ---
 
+  // 物品图标（贴图引用）— 用 identifier 作为贴图短名
+  const itemId = data.identifier || 'change_me';
+  components['minecraft:icon'] = itemId;
+
   // 附魔
   if (data.enchantableEnable && data.enchantable !== undefined) {
     components['minecraft:enchantable'] = {

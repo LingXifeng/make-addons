@@ -7,6 +7,7 @@ import { generateItemJSON, generateClientEntity } from './generator';
 interface AddonFile {
   path: string;
   content: string;
+  isBase64?: boolean; // 贴图等二进制文件用 base64 字符串
 }
 
 // 生成 UUID
@@ -59,6 +60,15 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
     manifest.dependencies.push({
       module_name: '@minecraft/server',
       version: '1.13.0',
+    });
+  }
+
+  // 依赖资源包（确保两个包同时加载）
+  const resourceUUID = project.resourceHeaderUUID || '';
+  if (resourceUUID) {
+    manifest.dependencies.push({
+      uuid: resourceUUID,
+      version: [1, 0, 0],
     });
   }
 
@@ -362,10 +372,19 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
 export function generateAddonFiles(project: Project, modules: ModuleDefinition[]): AddonFile[] {
   const files: AddonFile[] = [];
 
+  // 预生成 UUID，确保行为包和资源包的依赖关系正确
+  const p: Project = {
+    ...project,
+    headerUUID: project.headerUUID || generateUUID(),
+    moduleUUID: project.moduleUUID || generateUUID(),
+    resourceHeaderUUID: project.resourceHeaderUUID || generateUUID(),
+    resourceModuleUUID: project.resourceModuleUUID || generateUUID(),
+  };
+
   // 收集所有项目
   const allItems: { module: ModuleDefinition; item: ProjectItem }[] = [];
   for (const module of modules) {
-    const items = project.items[module.id] || [];
+    const items = p.items[module.id] || [];
     for (const item of items) {
       allItems.push({ module, item });
     }
@@ -379,19 +398,13 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
   // 行为包 manifest
   files.push({
     path: 'behavior_pack/manifest.json',
-    content: generateBehaviorManifest(project, hasScript),
+    content: generateBehaviorManifest(p, hasScript),
   });
 
   // 资源包 manifest
   files.push({
     path: 'resource_pack/manifest.json',
-    content: generateResourceManifest(project),
-  });
-
-  // 行为包 pack_icon (placeholder)
-  files.push({
-    path: 'behavior_pack/pack_icon.png',
-    content: '', // Will be handled separately
+    content: generateResourceManifest(p),
   });
 
   // 生成每个项目的 JSON 文件
@@ -425,6 +438,44 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
         path: `behavior_pack/recipes/${id}_craft.json`,
         content: recipeJson,
       });
+    }
+  }
+
+  // 贴图文件 + item_texture.json 映射
+  const textureItems = allItems.filter(({ module }) =>
+    ['weapon', 'armor', 'food', 'tool', 'normal', 'block'].includes(module.id)
+  );
+
+  if (textureItems.length > 0) {
+    // 生成 item_texture.json
+    const textureData: Record<string, { textures: string }> = {};
+    for (const { item } of textureItems) {
+      const id = item.data.identifier || 'change_me';
+      textureData[id] = { textures: `textures/items/${id}` };
+    }
+    files.push({
+      path: 'resource_pack/textures/item_texture.json',
+      content: JSON.stringify({
+        resource_pack_name: 'pa',
+        texture_name: 'atlas.items',
+        texture_data: textureData,
+      }, null, 2),
+    });
+
+    // 导出自定义贴图 PNG
+    for (const { item } of textureItems) {
+      if (item.customTexture?.dataUrl) {
+        const id = item.data.identifier || 'change_me';
+        // 从 data URL 提取 base64 数据
+        const base64Match = item.customTexture.dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+        if (base64Match) {
+          files.push({
+            path: `resource_pack/textures/items/${id}.png`,
+            content: base64Match[1],
+            isBase64: true,
+          });
+        }
+      }
     }
   }
 
@@ -478,12 +529,12 @@ export async function exportAsMcaddon(project: Project, modules: ModuleDefinitio
     if (file.path.startsWith('behavior_pack/')) {
       const relPath = file.path.replace('behavior_pack/', '');
       if (relPath && file.content) {
-        behaviorFolder.file(relPath, file.content);
+        behaviorFolder.file(relPath, file.content, file.isBase64 ? { base64: true } : undefined);
       }
     } else if (file.path.startsWith('resource_pack/')) {
       const relPath = file.path.replace('resource_pack/', '');
       if (relPath && file.content) {
-        resourceFolder.file(relPath, file.content);
+        resourceFolder.file(relPath, file.content, file.isBase64 ? { base64: true } : undefined);
       }
     }
   }
