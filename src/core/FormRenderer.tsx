@@ -228,6 +228,14 @@ function renderControl(
         />
       );
 
+    case 'craftingGrid':
+      return (
+        <CraftingGridInput
+          value={value || { grid: ['', '', '', '', '', '', '', '', ''], mapping: {} }}
+          onChange={v => onChange(field.key, v)}
+        />
+      );
+
     case 'repairItems':
       return (
         <RepairItemsInput
@@ -640,6 +648,89 @@ function RecipeItemsInput({ value, onChange, data }: { value: Record<string, str
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+// ===== 3x3 合成格子 + 字母映射表 =====
+
+interface CraftingGridData {
+  grid: string[];      // 9 个格子，每个格子一个字符或空字符串
+  mapping: Record<string, string>;  // 字母 → 物品ID
+}
+
+function CraftingGridInput({ value, onChange }: {
+  value: CraftingGridData;
+  onChange: (v: CraftingGridData) => void;
+}) {
+  const grid: string[] = (value.grid && value.grid.length === 9)
+    ? value.grid
+    : ['', '', '', '', '', '', '', '', ''];
+  const mapping: Record<string, string> = value.mapping || {};
+
+  // 从格子中提取所有使用过的字符（去重排序）
+  const usedChars = Array.from(new Set(grid.filter(c => c.trim()))).sort();
+
+  // 更新某个格子
+  const updateCell = (index: number, char: string) => {
+    // 只取第一个字符，转大写
+    const c = char.trim().slice(0, 1).toUpperCase();
+    const newGrid = [...grid];
+    newGrid[index] = c;
+    onChange({ grid: newGrid, mapping });
+  };
+
+  // 更新某个字母的映射
+  const updateMapping = (char: string, item: string) => {
+    onChange({ grid, mapping: { ...mapping, [char]: item } });
+  };
+
+  // 清空格子
+  const clearGrid = () => {
+    onChange({ grid: ['', '', '', '', '', '', '', '', ''], mapping });
+  };
+
+  return (
+    <div className="crafting-grid-input">
+      {/* 3x3 格子 */}
+      <div className="crafting-grid-3x3">
+        {grid.map((cell, i) => (
+          <input
+            key={i}
+            type="text"
+            className="crafting-cell"
+            value={cell}
+            maxLength={1}
+            onChange={e => updateCell(i, e.target.value)}
+            placeholder="·"
+          />
+        ))}
+      </div>
+
+      <div className="crafting-grid-actions">
+        <button type="button" onClick={clearGrid}>清空格子</button>
+      </div>
+
+      {/* 字母映射表 */}
+      <div className="crafting-mapping-section">
+        <h4 className="crafting-mapping-title">字母映射表</h4>
+        {usedChars.length === 0 && (
+          <p className="field-hint">请先在上方格子中填入字母</p>
+        )}
+        {usedChars.map(char => (
+          <div key={char} className="crafting-mapping-row">
+            <span className="crafting-mapping-key">{char}</span>
+            <span className="crafting-mapping-arrow">→</span>
+            <input
+              type="text"
+              className="crafting-mapping-input"
+              value={mapping[char] || ''}
+              onChange={e => updateMapping(char, e.target.value)}
+              placeholder="minecraft:item_id"
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

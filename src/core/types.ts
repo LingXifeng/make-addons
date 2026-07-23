@@ -18,6 +18,7 @@ export type FieldType =
   | 'stringList'  // 字符串列表（标签等）
   | 'recipePattern' // 配方图案网格
   | 'recipeItems'   // 配方物品映射
+  | 'craftingGrid'  // 3x3 合成格子 + 字母映射表
   | 'color'       // 颜色选择器
   | 'section';    // 分组标题
 

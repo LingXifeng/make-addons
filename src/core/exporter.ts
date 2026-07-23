@@ -325,16 +325,32 @@ function generateRecipeJSON(item: ProjectItem, module: ModuleDefinition): string
   const recipeId = `pa:recipe_${itemId}`;
 
   if (data.craftingType === 'shaped') {
-    // 有序合成
-    const pattern = (data.craftingPattern || 'XX\nXX').split('\n').filter((line: string) => line.length > 0);
+    // 有序合成 - 从 craftingGrid 生成 pattern 和 key
+    const gridData = data.craftingGrid || { grid: ['', '', '', '', '', '', '', '', ''], mapping: {} };
+    const grid: string[] = gridData.grid || ['', '', '', '', '', '', '', '', ''];
+    const mapping: Record<string, string> = gridData.mapping || {};
+
+    // 将 9 格转换为 3 行 pattern
+    const rows: string[] = [];
+    for (let r = 0; r < 3; r++) {
+      let row = '';
+      for (let c = 0; c < 3; c++) {
+        row += grid[r * 3 + c] || ' ';
+      }
+      rows.push(row);
+    }
+    // 去掉全空行
+    const pattern = rows.filter(row => row.trim().length > 0);
+
+    // 构建 key 映射
     const keyMap: Record<string, { item: string }> = {};
-    const keyLines = (data.craftingKey || '').split('\n').filter((line: string) => line.trim().length > 0);
-    for (const line of keyLines) {
-      const [char, itemPath] = line.split('=').map((s: string) => s.trim());
+    for (const [char, itemPath] of Object.entries(mapping)) {
       if (char && itemPath) {
         keyMap[char] = { item: itemPath };
       }
     }
+
+    if (pattern.length === 0 || Object.keys(keyMap).length === 0) return null;
     const recipe = {
       format_version: '1.21.0',
       'minecraft:recipe_shaped': {

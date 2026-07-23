@@ -917,3 +917,110 @@ body {
   border-radius: 6px;
   font-size: 13px;
 }
+
+/* ===== 3x3 合成格子 ===== */
+.crafting-grid-input {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.crafting-grid-3x3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 180px;
+}
+
+.crafting-cell {
+  width: 56px;
+  height: 56px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: monospace;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.crafting-cell:focus {
+  border-color: var(--accent);
+}
+
+.crafting-cell::placeholder {
+  color: var(--text-tertiary);
+  font-weight: 400;
+  font-size: 20px;
+}
+
+.crafting-grid-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.crafting-grid-actions button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.crafting-grid-actions button:hover {
+  background: var(--bg-secondary);
+}
+
+/* 字母映射表 */
+.crafting-mapping-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crafting-mapping-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 4px 0;
+}
+
+.crafting-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crafting-mapping-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: monospace;
+  border: 1px solid var(--border);
+}
+
+.crafting-mapping-arrow {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.crafting-mapping-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
