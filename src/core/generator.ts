@@ -896,6 +896,324 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
   return result;
 }
 
+
+// ===== Particle 生成器 =====
+function generateParticle(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || item.name;
+
+  return {
+    format_version: '1.21.100',
+    'minecraft:particle_effect': {
+      description: {
+        identifier: `${ns}:${id}`,
+        basic_render_parameters: {
+          material: data.material || 'particles_alpha',
+          texture: data.texture || `textures/particle/${id}`,
+        },
+      },
+      components: {
+        'minecraft:emitter_rate_instant': {
+          num_particles: data.numParticles ?? 10,
+        },
+        'minecraft:emitter_lifetime_once': {
+          active_time: data.activeTime ?? 1.0,
+        },
+        'minecraft:emitter_shape_sphere': {
+          radius: data.radius ?? 0.1,
+          surface_only: data.surfaceOnly ?? false,
+        },
+        'minecraft:particle_lifetime_expression': {
+          max_lifetime: data.maxLifetime ?? 1.0,
+        },
+        'minecraft:particle_initial_speed': data.initialSpeed ?? 2.0,
+        'minecraft:particle_motion_dynamic': {},
+        'minecraft:particle_appearance_billboard': {
+          size: [data.sizeWidth ?? 0.1, data.sizeHeight ?? 0.1],
+          facing_camera_mode: data.facingMode || 'rotate_xyz',
+        },
+        'minecraft:particle_appearance_tinting': {
+          color: data.color || [1.0, 1.0, 1.0, 1.0],
+        },
+      },
+    },
+  };
+}
+
+// ===== Projectile 生成器 =====
+function generateProjectile(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || item.name;
+
+  const components: Record<string, any> = {
+    'minecraft:collision_box': {
+      width: data.collisionWidth ?? 0.25,
+      height: data.collisionHeight ?? 0.25,
+    },
+    'minecraft:projectile': {
+      on_hit: {
+        impact_damage: {
+          damage: data.damage ?? 4,
+          knockback: data.knockback ?? true,
+          semi_random_diff_raycasting: data.semiRandom ?? false,
+          destroy_on_hit: data.destroyOnHit ?? true,
+        },
+        remove_entity: {},
+      },
+      power: data.power ?? 2.0,
+      gravity: data.gravity ?? 0.05,
+      uncertainty: data.uncertainty ?? 0.0,
+    },
+    'minecraft:physics': {},
+    'minecraft:pushable': {
+      is_pushable: false,
+      is_pushable_by_piston: false,
+    },
+    'minecraft:conditional_kill': {
+      conditional_kill_on_hit: true,
+    },
+  };
+
+  if (data.particleEffect) {
+    components['minecraft:trail'] = {
+      particle_effect: data.particleEffect,
+      spawn_interval: data.trailInterval ?? 1,
+      spawn_distance: data.trailDistance ?? 1,
+    };
+  }
+
+  if (data.lightingOnFire) {
+    components['minecraft:ignite'] = {
+      fire_ignition_duration: data.fireDuration ?? 5,
+    };
+  }
+
+  return {
+    format_version: '1.21.100',
+    'minecraft:entity': {
+      description: {
+        identifier: `${ns}:${id}`,
+        is_summonable: true,
+        is_spawnable: false,
+        is_experimental: false,
+        properties: {},
+      },
+      components,
+    },
+  };
+}
+
+// ===== SpawnRule 生成器 =====
+function generateSpawnRule(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || item.name;
+
+  const conditions: Record<string, any> = {};
+
+  if (data.minBrightness !== undefined || data.maxBrightness !== undefined) {
+    conditions.brightness_interval = {
+      min: data.minBrightness ?? 0,
+      max: data.maxBrightness ?? 15,
+    };
+  }
+
+  if (data.minHeight !== undefined || data.maxHeight !== undefined) {
+    conditions.height_interval = [data.minHeight ?? -64, data.maxHeight ?? 320];
+  }
+
+  if (data.requiredBiomes?.length) {
+    conditions.required_biomes = data.requiredBiomes;
+  }
+
+  if (data.excludedBiomes?.length) {
+    conditions.excluded_biomes = data.excludedBiomes;
+  }
+
+  if (data.temperature !== undefined) {
+    conditions.temperature = data.temperature;
+  }
+
+  if (data.spawnAboveBlock) {
+    conditions.spawn_above_block = data.spawnAboveBlock;
+  }
+
+  return {
+    format_version: '1.21.100',
+    'minecraft:spawn_rules': {
+      description: {
+        identifier: `${ns}:${id}`,
+        population_control: data.populationControl || 'animal',
+      },
+      conditions: [
+        {
+          ...conditions,
+          spawns_on_surface: data.spawnsOnSurface ?? true,
+          weight: data.weight ?? 100,
+          herd: {
+            min_size: data.herdMin ?? 1,
+            max_size: data.herdMax ?? 4,
+          },
+        },
+      ],
+    },
+  };
+}
+
+// ===== 自定义物品生成器 (bow/crossbow/shield/mace/arrow/music_disc/bundle/recall_item/soul_stone) =====
+function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || item.name;
+
+  const components: Record<string, any> = {};
+
+  // 通用物品组件
+  if (data.maxStackSize !== undefined) {
+    components['minecraft:max_stack_size'] = data.maxStackSize;
+  }
+
+  if (data.icon) {
+    components['minecraft:icon'] = { texture: data.icon };
+  }
+
+  if (data.displayName) {
+    components['minecraft:display_name'] = { value: data.displayName };
+  }
+
+  if (data.rarity) {
+    components['minecraft:rarity'] = data.rarity;
+  }
+
+  if (data.fireResistant) {
+    components['minecraft:fire_resistant'] = {};
+  }
+
+  if (data.menuCategory) {
+    components['minecraft:menu_category'] = {
+      category: data.menuCategory,
+    };
+  }
+
+  if (data.tags?.length) {
+    components['minecraft:tags'] = { tags: data.tags };
+  }
+
+  // 模块特定组件
+  switch (module.id) {
+    case 'bow':
+    case 'crossbow':
+      components['minecraft:shooter'] = {
+        ammunition: data.ammunition || 'minecraft:arrow',
+        max_draw_duration: data.maxDrawDuration ?? 1.2,
+        scale_power_by_draw_duration: data.scalePowerByDraw ?? true,
+      };
+      if (module.id === 'crossbow') {
+        components['minecraft:chargeable'] = {};
+      }
+      components['minecraft:durability'] = {
+        max_durability: data.maxDurability ?? 384,
+      };
+      components['minecraft:hand_equipped'] = {};
+      break;
+
+    case 'shield':
+      components['minecraft:wearable'] = {
+        slot: 'slot.offhand',
+      };
+      components['minecraft:durability'] = {
+        max_durability: data.maxDurability ?? 336,
+      };
+      components['minecraft:blocking'] = {};
+      break;
+
+    case 'mace':
+      components['minecraft:damage'] = data.damage ?? 7;
+      components['minecraft:weapon'] = {};
+      components['minecraft:durability'] = {
+        max_durability: data.maxDurability ?? 500,
+      };
+      components['minecraft:hand_equipped'] = {};
+      components['minecraft:enchantable'] = {
+        slot: 'sword',
+        value: data.enchantValue ?? 14,
+      };
+      if (data.smashAttackCooldown !== undefined) {
+        components['minecraft:custom_components'] = ['pa:mace_smash_attack'];
+      }
+      break;
+
+    case 'arrow':
+      components['minecraft:projectile'] = {
+        projectile_entity: data.projectileEntity || 'minecraft:arrow',
+      };
+      components['minecraft:ammo'] = {};
+      break;
+
+    case 'music_disc':
+      components['minecraft:record'] = {
+        sound_event: data.soundEvent || 'music.custom',
+        duration: data.duration ?? 120,
+        comparator_signal: data.comparatorSignal ?? 13,
+      };
+      components['minecraft:max_stack_size'] = 1;
+      break;
+
+    case 'bundle':
+      components['minecraft:bundle'] = {};
+      components['minecraft:max_stack_size'] = 1;
+      break;
+
+    case 'recall_item':
+      components['minecraft:custom_components'] = ['pa:recall_teleport'];
+      components['minecraft:max_stack_size'] = data.maxStackSize ?? 1;
+      if (data.cooldown !== undefined) {
+        components['minecraft:cooldown'] = {
+          category: 'recall',
+          duration: data.cooldown,
+        };
+      }
+      break;
+
+    case 'soul_stone':
+      components['minecraft:custom_components'] = ['pa:soul_capture'];
+      components['minecraft:max_stack_size'] = data.maxStackSize ?? 16;
+      if (data.captureRadius !== undefined) {
+        components['minecraft:custom_components'].push('pa:soul_stone_radius');
+      }
+      break;
+  }
+
+  // 可修复组件
+  if (data.repairable) {
+    components['minecraft:repairable'] = {
+      repair_items: [data.repairable],
+    };
+  }
+
+  // 附魔槽位
+  if (data.enchantableSlot && !components['minecraft:enchantable']) {
+    components['minecraft:enchantable'] = {
+      slot: data.enchantableSlot,
+      value: data.enchantableValue ?? 10,
+    };
+  }
+
+  return {
+    format_version: '1.21.100',
+    'minecraft:item': {
+      description: {
+        identifier: `${ns}:${id}`,
+        menu_category: {
+          category: data.menuCategory || 'items',
+        },
+      },
+      components,
+    },
+  };
+}
 // ===== 主生成函数 =====
 export function generateItemJSON(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
   switch (module.id) {
@@ -914,6 +1232,22 @@ export function generateItemJSON(module: ModuleDefinition, item: ProjectItem): R
       return generateBiome(module, item);
     case 'recipe':
       return generateRecipe(module, item);
+    case 'particle':
+      return generateParticle(module, item);
+    case 'projectile':
+      return generateProjectile(module, item);
+    case 'spawn_rule':
+      return generateSpawnRule(module, item);
+    case 'bow':
+    case 'crossbow':
+    case 'shield':
+    case 'mace':
+    case 'arrow':
+    case 'music_disc':
+    case 'bundle':
+    case 'recall_item':
+    case 'soul_stone':
+      return generateCustomItem(module, item);
     default:
       return generateItem(module, item);
   }

@@ -18,8 +18,8 @@ function createTestItem(module: ModuleDefinition, subTypeId?: string): ProjectIt
 }
 
 describe('模块注册表', () => {
-  it('应包含所有 9 个模块', () => {
-    expect(allModules.length).toBe(9);
+  it('应包含所有 21 个模块', () => {
+    expect(allModules.length).toBe(21);
     const ids = allModules.map(m => m.id);
     expect(ids).toContain('weapon');
     expect(ids).toContain('armor');
@@ -28,6 +28,18 @@ describe('模块注册表', () => {
     expect(ids).toContain('entity');
     expect(ids).toContain('biome');
     expect(ids).toContain('recipe');
+    expect(ids).toContain('particle');
+    expect(ids).toContain('projectile');
+    expect(ids).toContain('spawn_rule');
+    expect(ids).toContain('bow');
+    expect(ids).toContain('crossbow');
+    expect(ids).toContain('shield');
+    expect(ids).toContain('mace');
+    expect(ids).toContain('arrow');
+    expect(ids).toContain('music_disc');
+    expect(ids).toContain('bundle');
+    expect(ids).toContain('recall_item');
+    expect(ids).toContain('soul_stone');
   });
 
   it('每个模块应有非空 fields', () => {

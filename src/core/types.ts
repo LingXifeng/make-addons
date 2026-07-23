@@ -66,7 +66,9 @@ export type JsonRootKey =
   | 'minecraft:biome'
   | 'minecraft:recipe_shaped'
   | 'minecraft:recipe_shapeless'
-  | 'minecraft:recipe_furnace';
+  | 'minecraft:recipe_furnace'
+  | 'minecraft:particle_effect'
+  | 'minecraft:spawn_rules';
 
 // 生成器类型
 export type GeneratorType =
@@ -76,7 +78,9 @@ export type GeneratorType =
   | 'block_door' | 'block_trapdoor' | 'block_fence_gate' | 'block_crop' | 'block_sapling'
   | 'block_layer' | 'block_transparent' | 'block_fluid'
   | 'entity' | 'biome'
-  | 'recipe_shaped' | 'recipe_shapeless' | 'recipe_furnace';
+  | 'recipe_shaped' | 'recipe_shapeless' | 'recipe_furnace'
+  | 'particle' | 'projectile' | 'spawn_rule'
+  | 'music_disc' | 'bundle' | 'recall_item' | 'soul_stone';
 
 export interface SubType {
   id: string;
