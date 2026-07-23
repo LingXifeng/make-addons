@@ -7,6 +7,7 @@ import { FormRenderer } from '../core/FormRenderer';
 import type { ProjectItem, SubType } from '../core/types';
 
 export function App() {
+  console.log('App rendering, modules:', allModules.length);
   const store = useProjectStore();
   const [previewJson, setPreviewJson] = useState<string>('');
   const [exporting, setExporting] = useState(false);
