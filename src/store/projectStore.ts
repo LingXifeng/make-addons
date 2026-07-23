@@ -135,7 +135,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const project = JSON.parse(stored);
-        set({ project });
+        // 确保 items 是 Record<string, ProjectItem[]> 格式
+        if (project && typeof project === 'object') {
+          if (!project.items || typeof project.items !== 'object' || Array.isArray(project.items)) {
+            project.items = {};
+          }
+          // 验证每个值都是数组
+          for (const key of Object.keys(project.items)) {
+            if (!Array.isArray(project.items[key])) {
+              delete project.items[key];
+            }
+          }
+          if (!project.name) project.name = '我的Addon';
+          if (!project.namespace) project.namespace = 'pa';
+          set({ project });
+        }
       }
     } catch (e) {
       console.error('Failed to load project:', e);

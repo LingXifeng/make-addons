@@ -15,9 +15,14 @@ export function App() {
   // 获取所有物品的扁平列表
   const allItems = useMemo(() => {
     const items: { item: ProjectItem; moduleId: string }[] = [];
-    for (const [moduleId, moduleItems] of Object.entries(store.project.items)) {
-      for (const item of moduleItems) {
-        items.push({ item, moduleId });
+    const projectItems = store.project.items;
+    if (projectItems && typeof projectItems === 'object' && !Array.isArray(projectItems)) {
+      for (const [moduleId, moduleItems] of Object.entries(projectItems)) {
+        if (Array.isArray(moduleItems)) {
+          for (const item of moduleItems) {
+            items.push({ item, moduleId });
+          }
+        }
       }
     }
     return items;
