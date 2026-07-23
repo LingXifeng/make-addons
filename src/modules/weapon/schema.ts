@@ -29,6 +29,7 @@ export const weaponFields: FieldSchema[] = [
   ]},
   { key: 'glint', label: '附魔光效', type: 'boolean', defaultValue: false, section: '战斗属性', jsonPath: 'components.minecraft:glint' },
   { key: 'handEquipped', label: '手持装备', type: 'boolean', defaultValue: true, section: '战斗属性', jsonPath: 'components.minecraft:hand_equipped', hint: 'true时像工具一样在手中显示3D模型' },
+  { key: 'lootingEnchantEnable', label: '掠夺附魔', type: 'boolean', defaultValue: false, section: '战斗属性', hint: '启用后击杀生物时额外掉落（需脚本支持）' },
 
   // --- 物品栏属性 ---
   { key: 'maxStackSize', label: '最大堆叠数', type: 'number', defaultValue: 1, min: 1, max: 64, step: 1, section: '物品栏属性', jsonPath: 'components.minecraft:max_stack_size' },
@@ -59,6 +60,7 @@ export const weaponFields: FieldSchema[] = [
     { label: '自然', value: 'nature' },
     { label: '无', value: 'none' },
   ]},
+  { key: 'tags', label: '物品标签', type: 'text', defaultValue: '', section: '物品栏属性', hint: '多个标签用逗号分隔，如 pa:custom,pa:weapon' },
 
   // --- 交互属性 ---
   { key: 'repairableEnable', label: '启用可修复', type: 'boolean', defaultValue: false, section: '交互属性' },
@@ -80,9 +82,24 @@ export const weaponFields: FieldSchema[] = [
   ]},
   { key: 'allowOffHand', label: '允许副手', type: 'boolean', defaultValue: false, section: '交互属性', jsonPath: 'components.minecraft:allow_off_hand' },
 
+  // 燃料
+  { key: 'fuelEnable', label: '燃料', type: 'boolean', defaultValue: false, section: '交互属性', hint: '物品可作为熔炉燃料使用' },
+  { key: 'fuelDuration', label: '燃烧时间(秒)', type: 'number', defaultValue: 10, min: 0, max: 9999, step: 1, section: '交互属性', showWhen: { field: 'fuelEnable', value: true }, hint: '物品在熔炉中燃烧的秒数' },
+
+  // 可投掷
+  { key: 'throwableEnable', label: '可投掷', type: 'boolean', defaultValue: false, section: '交互属性', hint: '物品可以像三叉戟一样投掷' },
+  { key: 'throwPower', label: '投掷力度', type: 'number', defaultValue: 1.5, min: 0.1, max: 10, step: 0.1, section: '交互属性', showWhen: { field: 'throwableEnable', value: true }, hint: '投掷时的初始速度' },
+
   // --- 方块交互 ---
   { key: 'canDestroy', label: '可破坏方块', type: 'blockList', defaultValue: [], section: '方块交互' },
   { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', defaultValue: false, section: '方块交互', showWhen: { field: 'canDestroy', value: 'nonempty' } },
+
+  // 使用方块限制 (minecraft:use_on)
+  { key: 'useOnBlocks', label: '使用方块限制', type: 'blockList', defaultValue: [], section: '方块交互', hint: '物品只能在这些方块上使用（留空则无限制）' },
+
+  // 挖掘工具 (minecraft:digger)
+  { key: 'diggerEnable', label: '挖掘工具', type: 'boolean', defaultValue: false, section: '方块交互', hint: '自定义对不同方块的挖掘速度' },
+  { key: 'diggerBlocks', label: '挖掘方块列表', type: 'repairItems', defaultValue: [], section: '方块交互', showWhen: { field: 'diggerEnable', value: true }, hint: '每项为方块ID和挖掘速度' },
 
   // --- 高级属性 ---
 
@@ -139,6 +156,41 @@ export const weaponFields: FieldSchema[] = [
 
   // 动能武器
   { key: 'kineticWeaponEnable', label: '动能武器', type: 'boolean', defaultValue: false, section: '高级属性', hint: '下落攻击增加伤害（需脚本支持）' },
+
+  // 可穿戴 (minecraft:wearable)
+  { key: 'wearableEnable', label: '可穿戴', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品可装备到指定槽位' },
+  { key: 'wearableSlot', label: '穿戴槽位', type: 'select', defaultValue: 'slot.weapon.mainhand', section: '高级属性', showWhen: { field: 'wearableEnable', value: true }, options: [
+    { label: '主手', value: 'slot.weapon.mainhand' },
+    { label: '副手', value: 'slot.weapon.offhand' },
+    { label: '头盔', value: 'slot.armor.head' },
+    { label: '胸甲', value: 'slot.armor.chest' },
+    { label: '护腿', value: 'slot.armor.legs' },
+    { label: '靴子', value: 'slot.armor.feet' },
+  ]},
+
+  // 可命名 (minecraft:nameable)
+  { key: 'nameableEnable', label: '可命名', type: 'boolean', defaultValue: false, section: '高级属性', hint: '允许在铁砧上重命名物品' },
+  { key: 'allowNameTagRenaming', label: '允许命名牌重命名', type: 'boolean', defaultValue: true, section: '高级属性', showWhen: { field: 'nameableEnable', value: true } },
+
+  // 战利品 (minecraft:loot)
+  { key: 'lootEnable', label: '战利品表', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品破坏时掉落战利品表内容' },
+  { key: 'lootTablePath', label: '战利品表路径', type: 'text', defaultValue: 'loot_tables/custom/weapon', section: '高级属性', showWhen: { field: 'lootEnable', value: true }, hint: '如 loot_tables/custom/weapon' },
+
+  // 伤害吸收 (MAM自定义)
+  { key: 'damageAbsorptionEnable', label: '伤害吸收', type: 'boolean', defaultValue: false, section: '高级属性', hint: '吸收特定来源的伤害（需脚本支持）' },
+  { key: 'absorbableCauses', label: '可吸收伤害来源', type: 'text', defaultValue: 'entity.player,entity.mob', section: '高级属性', showWhen: { field: 'damageAbsorptionEnable', value: true }, hint: '逗号分隔的伤害来源，如 entity.player,entity.mob' },
+
+  // 暴击粒子 (MAM自定义/Projectile)
+  { key: 'critParticleOnHurt', label: '暴击粒子', type: 'boolean', defaultValue: false, section: '高级属性', hint: '暴击时显示粒子效果（需脚本支持）' },
+
+  // 命中销毁 (MAM自定义/Projectile)
+  { key: 'destroyOnHit', label: '命中销毁', type: 'boolean', defaultValue: false, section: '高级属性', hint: '投掷物命中后立即销毁（需脚本支持）' },
+
+  // 反弹伤害 (MAM自定义/Projectile)
+  { key: 'reflectOnHurt', label: '反弹伤害', type: 'boolean', defaultValue: false, section: '高级属性', hint: '受到攻击时反弹伤害给攻击者（需脚本支持）' },
+
+  // 半随机差异伤害 (MAM自定义/Projectile)
+  { key: 'semiRandomDiffDamage', label: '半随机差异伤害', type: 'boolean', defaultValue: false, section: '高级属性', hint: '伤害值在基础值附近半随机波动（需脚本支持）' },
 ];
 
 // ===== 武器模块定义 =====

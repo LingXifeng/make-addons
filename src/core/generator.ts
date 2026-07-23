@@ -279,6 +279,136 @@ export async function generateItemJson(
       continue;
     }
 
+    // === 新增标准组件处理 ===
+
+    // 燃料 (minecraft:fuel)
+    if (field.key === 'fuelDuration' && data.fuelEnable) {
+      components['minecraft:fuel'] = { duration: value };
+      continue;
+    }
+
+    // 可投掷 (minecraft:throwable)
+    if (field.key === 'throwPower' && data.throwableEnable) {
+      components['minecraft:throwable'] = { throw_power: value };
+      continue;
+    }
+
+    // 使用方块限制 (minecraft:use_on)
+    if (field.key === 'useOnBlocks' && Array.isArray(value) && value.length > 0) {
+      components['minecraft:use_on'] = { blocks: value };
+      continue;
+    }
+
+    // 挖掘工具 (minecraft:digger)
+    if (field.key === 'diggerBlocks' && data.diggerEnable) {
+      if (Array.isArray(value) && value.length > 0) {
+        components['minecraft:digger'] = {
+          destroy_speeds: value.map((d: any) => ({
+            block: d.items?.[0] || d.items || 'minecraft:stone',
+            speed: d.repairAmount ?? 1,
+          })),
+        };
+      }
+      continue;
+    }
+
+    // 可穿戴 (minecraft:wearable)
+    if (field.key === 'wearableSlot' && data.wearableEnable) {
+      components['minecraft:wearable'] = { slot: value };
+      continue;
+    }
+
+    // 物品标签 (description.tags)
+    if (field.key === 'tags' && value) {
+      const tagList = value.split(',').map((t: string) => t.trim()).filter(Boolean);
+      const existingTags = itemDef.description?.tags || [];
+      for (const t of tagList) {
+        if (!existingTags.includes(t)) {
+          existingTags.push(t);
+        }
+      }
+      setByPath(result, 'minecraft:item.description.tags', existingTags);
+      continue;
+    }
+
+    // 可命名 (minecraft:nameable)
+    if (field.key === 'allowNameTagRenaming' && data.nameableEnable) {
+      components['minecraft:nameable'] = { allow_name_tag_renaming: value };
+      continue;
+    }
+
+    // 战利品表 (minecraft:loot)
+    if (field.key === 'lootTablePath' && data.lootEnable && value) {
+      components['minecraft:loot'] = { loot_table: value };
+      continue;
+    }
+
+    // === MAM 自定义/脚本属性（通过 item tag 标记，脚本读取） ===
+
+    // 掠夺附魔
+    if (field.key === 'lootingEnchantEnable' && value === true) {
+      const tags2 = itemDef.description?.tags || [];
+      if (!tags2.includes('pa:looting_enchant')) {
+        tags2.push('pa:looting_enchant');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags2);
+      continue;
+    }
+
+    // 伤害吸收
+    if (field.key === 'absorbableCauses' && data.damageAbsorptionEnable && value) {
+      const tags3 = itemDef.description?.tags || [];
+      if (!tags3.includes('pa:damage_absorption')) {
+        tags3.push('pa:damage_absorption');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags3);
+      components['minecraft:custom_components'] = components['minecraft:custom_components'] || [];
+      if (!components['minecraft:custom_components'].includes('pa:absorb_damage')) {
+        components['minecraft:custom_components'].push('pa:absorb_damage');
+      }
+      continue;
+    }
+
+    // 暴击粒子
+    if (field.key === 'critParticleOnHurt' && value === true) {
+      const tags4 = itemDef.description?.tags || [];
+      if (!tags4.includes('pa:crit_particle_on_hurt')) {
+        tags4.push('pa:crit_particle_on_hurt');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags4);
+      continue;
+    }
+
+    // 命中销毁
+    if (field.key === 'destroyOnHit' && value === true) {
+      const tags5 = itemDef.description?.tags || [];
+      if (!tags5.includes('pa:destroy_on_hit')) {
+        tags5.push('pa:destroy_on_hit');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags5);
+      continue;
+    }
+
+    // 反弹伤害
+    if (field.key === 'reflectOnHurt' && value === true) {
+      const tags6 = itemDef.description?.tags || [];
+      if (!tags6.includes('pa:reflect_on_hurt')) {
+        tags6.push('pa:reflect_on_hurt');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags6);
+      continue;
+    }
+
+    // 半随机差异伤害
+    if (field.key === 'semiRandomDiffDamage' && value === true) {
+      const tags7 = itemDef.description?.tags || [];
+      if (!tags7.includes('pa:semi_random_diff_damage')) {
+        tags7.push('pa:semi_random_diff_damage');
+      }
+      setByPath(result, 'minecraft:item.description.tags', tags7);
+      continue;
+    }
+
     // 普通字段直接设置
     setByPath(result, field.jsonPath, value);
   }
