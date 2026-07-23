@@ -395,6 +395,7 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
       case 'soul_stone':
       case 'spawn_egg':
         lines.push(`item.${ns}:${id}.name=${name}`);
+        lines.push(`item.${ns}:${id}=${name}`); // MAM 格式：额外一行不带 .name
         break;
       case 'block':
         lines.push(`tile.${ns}:${id}.name=${name}`);

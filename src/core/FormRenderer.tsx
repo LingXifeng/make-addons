@@ -413,18 +413,18 @@ function RepairItemsInput({ value, onChange }: { value: any[]; onChange: (v: any
           />
           <input
             type="text"
-            value={item.repairAmount || ''}
+            value={item.repair_amount || ''}
             placeholder="q.max_durability * 0.25"
             onChange={e => {
               const newValue = [...value];
-              newValue[i] = { ...item, repairAmount: e.target.value };
+              newValue[i] = { ...item, repair_amount: e.target.value };
               onChange(newValue);
             }}
           />
           <button onClick={() => onChange(value.filter((_, j) => j !== i))}>删除</button>
         </div>
       ))}
-      <button onClick={() => onChange([...value, { items: ['minecraft:diamond'], repairAmount: 'q.max_durability * 0.25' }])}>
+      <button onClick={() => onChange([...value, { items: ['minecraft:diamond'], repair_amount: 'q.max_durability * 0.25' }])}>
         + 添加修复材料
       </button>
     </div>

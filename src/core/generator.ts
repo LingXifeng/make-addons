@@ -98,7 +98,10 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
   // 可修复
   if (data.repairableEnable && data.repairableItems?.length > 0) {
     components['minecraft:repairable'] = {
-      repair_items: data.repairableItems.map((id: string) => ({ items: [id] })),
+      repair_items: data.repairableItems.map((item: any) => ({
+        items: item.items || [item],
+        repair_amount: item.repair_amount || item.repairAmount || 'q.max_durability * 0.25',
+      })),
     };
   }
 
@@ -286,7 +289,7 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
 
   // 耐火
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   // 标签
@@ -875,7 +878,7 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
 
   // --- 耐火 ---
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   // --- 标签 ---
@@ -1077,11 +1080,11 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
   }
 
   if (data.rarity) {
-    components['minecraft:rarity'] = data.rarity;
+    components['minecraft:rarity'] = { value: data.rarity };
   }
 
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   if (data.menuCategory) {
@@ -1182,7 +1185,7 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
   // 可修复组件
   if (data.repairable) {
     components['minecraft:repairable'] = {
-      repair_items: [data.repairable],
+      repair_items: [{ items: [data.repairable], repair_amount: 'q.max_durability * 0.25' }],
     };
   }
 
