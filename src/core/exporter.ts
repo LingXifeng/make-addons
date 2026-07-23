@@ -329,40 +329,41 @@ function generateRecipeJSON(item: ProjectItem, module: ModuleDefinition): string
     // 去掉全空行
     const pattern = rows.filter(row => row.trim().length > 0);
 
-    // 构建 key 映射
-    const keyMap: Record<string, { item: string }> = {};
+    // 构建 key 映射 (1.12 格式需要 data: 0)
+    const keyMap: Record<string, { item: string; data: number }> = {};
     for (const [char, itemPath] of Object.entries(mapping)) {
       if (char && itemPath) {
-        keyMap[char] = { item: itemPath };
+        keyMap[char] = { item: itemPath, data: 0 };
       }
     }
 
     if (pattern.length === 0 || Object.keys(keyMap).length === 0) return null;
     const recipe = {
-      format_version: '1.21.0',
+      format_version: '1.12',
       'minecraft:recipe_shaped': {
         description: { identifier: recipeId },
         tags: ['crafting_table'],
         pattern,
         key: keyMap,
-        result: { item: resultId, count },
+        result: { item: resultId, data: 0, count },
       },
     };
     return JSON.stringify(recipe, null, 2);
   } else {
     // 无序合成
     const ingredients = (data.craftingIngredients || []).map((ing: string) => {
-      // repairItems 格式可能是 "minecraft:stick" 或带冒号
-      return ing.includes(':') ? ing : `minecraft:${ing}`;
+      // 1.12 格式需要对象形式 { item, data }
+      const itemId = ing.includes(':') ? ing : `minecraft:${ing}`;
+      return { item: itemId, data: 0 };
     });
     if (ingredients.length === 0) return null;
     const recipe = {
-      format_version: '1.21.0',
+      format_version: '1.12',
       'minecraft:recipe_shapeless': {
         description: { identifier: recipeId },
         tags: ['crafting_table'],
         ingredients,
-        result: { item: resultId, count },
+        result: { item: resultId, data: 0, count },
       },
     };
     return JSON.stringify(recipe, null, 2);
