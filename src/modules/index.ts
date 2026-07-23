@@ -20,6 +20,16 @@ import { musicDiscModule } from './music_disc/schema';
 import { bundleModule } from './bundle/schema';
 import { recallItemModule } from './recall_item/schema';
 import { soulStoneModule } from './soul_stone/schema';
+import { animationModule } from './animation/schema';
+import { soundModule } from './sound/schema';
+import { textureModule } from './texture/schema';
+import { shaderModule } from './shader/schema';
+import { skinModule } from './skin/schema';
+import { functionModule } from './function/schema';
+import { scriptModule } from './script/schema';
+import { structureModule } from './structure/schema';
+import { spawnEggModule } from './spawn_egg/schema';
+import { lootModule } from './loot/schema';
 
 // ===== 所有模块注册表 =====
 
@@ -39,12 +49,22 @@ export const allModules: ModuleDefinition[] = [
   bundleModule,
   recallItemModule,
   soulStoneModule,
+  spawnEggModule,
+  lootModule,
   entityModule,
   projectileModule,
   biomeModule,
   spawnRuleModule,
   recipeModule,
   particleModule,
+  animationModule,
+  soundModule,
+  textureModule,
+  shaderModule,
+  skinModule,
+  functionModule,
+  scriptModule,
+  structureModule,
 ];
 
 // 按类别分组
@@ -65,11 +85,15 @@ export const modulesByCategory: Record<string, ModuleDefinition[]> = {
     bundleModule,
     recallItemModule,
     soulStoneModule,
+    spawnEggModule,
+    lootModule,
   ],
   custom_entities: [entityModule, projectileModule],
   custom_environment: [biomeModule, spawnRuleModule],
   custom_recipes: [recipeModule],
   custom_particles: [particleModule],
+  custom_graphics: [animationModule, soundModule, textureModule, shaderModule, skinModule],
+  custom_functions: [functionModule, scriptModule, structureModule],
 };
 
 // 类别中文名
@@ -79,6 +103,8 @@ export const categoryNames: Record<string, string> = {
   custom_environment: '自定义环境',
   custom_recipes: '自定义配方',
   custom_particles: '自定义粒子',
+  custom_graphics: '自定义图形',
+  custom_functions: '自定义功能',
 };
 
 // 类别图标
@@ -88,6 +114,8 @@ export const categoryIcons: Record<string, string> = {
   custom_environment: '🌍',
   custom_recipes: '📖',
   custom_particles: '✨',
+  custom_graphics: '🎨',
+  custom_functions: '⚙️',
 };
 
 // 根据 ID 获取模块

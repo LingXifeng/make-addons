@@ -83,7 +83,28 @@ function renderControl(
           type="text"
           value={value || ''}
           onChange={e => onChange(field.key, e.target.value)}
-          placeholder={field.hint || ''}
+          placeholder={field.placeholder || field.hint || ''}
+        />
+      );
+
+    case 'textarea':
+      return (
+        <textarea
+          value={value || ''}
+          onChange={e => onChange(field.key, e.target.value)}
+          placeholder={field.placeholder || field.hint || ''}
+          rows={6}
+          style={{ width: '100%', fontFamily: 'monospace', fontSize: '12px' }}
+        />
+      );
+
+    case 'tags':
+      return (
+        <input
+          type="text"
+          value={Array.isArray(value) ? value.join(', ') : (value || '')}
+          onChange={e => onChange(field.key, e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean))}
+          placeholder={field.placeholder || field.hint || '用逗号分隔'}
         />
       );
 

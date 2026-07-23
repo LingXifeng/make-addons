@@ -18,8 +18,8 @@ function createTestItem(module: ModuleDefinition, subTypeId?: string): ProjectIt
 }
 
 describe('模块注册表', () => {
-  it('应包含所有 21 个模块', () => {
-    expect(allModules.length).toBe(21);
+  it('应包含所有 31 个模块', () => {
+    expect(allModules.length).toBe(31);
     const ids = allModules.map(m => m.id);
     expect(ids).toContain('weapon');
     expect(ids).toContain('armor');

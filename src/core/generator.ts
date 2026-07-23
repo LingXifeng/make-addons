@@ -1214,6 +1214,452 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
     },
   };
 }
+// ===== 函数生成器 (function) =====
+function generateFunction(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = data.namespace || 'pa';
+  const id = data.identifier || 'change_me';
+
+  return {
+    format_version: '1.21.100',
+    'minecraft:function': {
+      description: {
+        identifier: `${ns}:${id}`,
+      },
+      commands: (data.commands || '').split('\n').filter((c: string) => c.trim()),
+    },
+  };
+}
+
+// ===== 生怪蛋生成器 (spawn_egg) =====
+function generateSpawnEgg(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || 'change_me';
+  const identifier = `${ns}:${id}`;
+
+  const components: Record<string, any> = {
+    'minecraft:spawn_egg': {
+      entity_type: data.entityType || `${ns}:change_me`,
+    },
+  };
+
+  if (data.baseColor && data.spotColor) {
+    components['minecraft:spawn_egg'].base_color = data.baseColor;
+    components['minecraft:spawn_egg'].spot_color = data.spotColor;
+  }
+
+  if (data.maxStackSize !== undefined) {
+    components['minecraft:max_stack_size'] = data.maxStackSize;
+  }
+
+  if (data.icon) {
+    components['minecraft:icon'] = { texture: data.icon };
+  }
+
+  if (data.aliases?.length) {
+    components['minecraft:aliases'] = data.aliases;
+  }
+
+  return {
+    format_version: '1.21.100',
+    'minecraft:item': {
+      description: {
+        identifier,
+        menu_category: {
+          category: data.menuCategory || 'nature',
+        },
+      },
+      components,
+    },
+  };
+}
+
+// ===== 纹理生成器 (texture) =====
+function generateTexture(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const key = data.textureKey || 'my_texture';
+  const path = data.texturePath || `textures/items/${key}`;
+
+  const textureEntry: Record<string, any> = {
+    textures: path,
+  };
+
+  if (data.isAnimated) {
+    textureEntry.frames = data.frames?.length ? data.frames : [0];
+    textureEntry.frame_time = data.frameTime || 1;
+    if (data.interpolate) {
+      textureEntry.interpolate = true;
+    }
+  }
+
+  if (data.blur) {
+    textureEntry.blur = true;
+  }
+  if (data.clamp) {
+    textureEntry.clamp = true;
+  }
+
+  return {
+    texture_data: {
+      [key]: textureEntry,
+    },
+  };
+}
+
+// ===== 动画生成器 (animation) =====
+function generateAnimation(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || 'change_me';
+  const animId = `animation.${ns}.${id}`;
+
+  const animation: Record<string, any> = {
+    anim_length: data.animationLength || 1.0,
+  };
+
+  // 循环模式
+  if (data.loop === 'loop') {
+    animation.loop = true;
+  } else if (data.loop === 'hold_on_last_frame') {
+    animation.loop = 'hold_on_last_frame';
+  }
+
+  if (data.overridePreviousAnimation) {
+    animation.override_previous_animation = true;
+  }
+
+  if (data.animTimeUpdate) {
+    animation.anim_time_update = data.animTimeUpdate;
+  }
+
+  if (data.blendWeight && data.blendWeight !== '1.0') {
+    animation.blend_weight = data.blendWeight;
+  }
+
+  if (data.startDelay) {
+    animation.start_delay = data.startDelay;
+  }
+
+  // 骨骼动画
+  const bone: Record<string, any> = {};
+  const hasRotation = data.rotationX !== '0' || data.rotationY !== '0' || data.rotationZ !== '0';
+  const hasPosition = data.positionX !== '0' || data.positionY !== '0' || data.positionZ !== '0';
+  const hasScale = data.scaleX !== '1' || data.scaleY !== '1' || data.scaleZ !== '1';
+
+  if (hasRotation) {
+    bone.rotation = [data.rotationX || '0', data.rotationY || '0', data.rotationZ || '0'];
+  }
+  if (hasPosition) {
+    bone.position = [data.positionX || '0', data.positionY || '0', data.positionZ || '0'];
+  }
+  if (hasScale) {
+    bone.scale = [data.scaleX || '1', data.scaleY || '1', data.scaleZ || '1'];
+  }
+
+  if (Object.keys(bone).length > 0) {
+    animation.bones = { [data.boneName || 'root']: bone };
+  }
+
+  return {
+    format_version: '1.21.100',
+    animations: {
+      [animId]: animation,
+    },
+  };
+}
+
+// ===== 声音生成器 (sound) =====
+function generateSound(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || 'change_me';
+  const soundId = `${ns}.${id}`;
+
+  const soundDef: Record<string, any> = {
+    category: data.soundCategory || 'neutral',
+  };
+
+  // 单声音或多变体
+  if (data.useMultipleSounds && data.soundVariants?.length) {
+    const sounds = data.soundVariants.map((s: string) => ({ sound: s }));
+    soundDef.sounds = sounds;
+    if (!data.equalWeight) {
+      // 加权随机需要单独处理
+      soundDef.sounds = data.soundVariants.map((s: string) => ({ sound: s, weight: 1 }));
+    }
+  } else {
+    const singleSound: Record<string, any> = {
+      sound: data.soundPath || `sounds/custom/${id}`,
+    };
+    if (data.volume !== undefined && data.volume !== 1.0) {
+      singleSound.volume = data.volume;
+    }
+    if (data.pitch !== undefined && data.pitch !== 1.0) {
+      singleSound.pitch = data.pitch;
+    }
+    if (data.minDistance) {
+      singleSound.min_distance = data.minDistance;
+    }
+    if (data.maxDistance && data.maxDistance !== 16) {
+      singleSound.max_distance = data.maxDistance;
+    }
+    soundDef.sounds = [singleSound];
+  }
+
+  if (data.stream) {
+    soundDef.stream = true;
+  }
+  if (data.loop) {
+    soundDef.loop = true;
+  }
+  if (!data.is3D) {
+    soundDef.is_3d = false;
+  }
+
+  return {
+    format_version: '1.21.100',
+    sound_definitions: {
+      [soundId]: soundDef,
+    },
+  };
+}
+
+// ===== 皮肤生成器 (skin/geometry) =====
+function generateSkin(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || 'change_me';
+  const geoId = `geometry.${ns}.${id}`;
+
+  // 构建立方体
+  const cube: Record<string, any> = {
+    origin: [data.cubeOriginX || 0, data.cubeOriginY || 0, data.cubeOriginZ || 0],
+    size: [data.cubeSizeX || 1, data.cubeSizeY || 1, data.cubeSizeZ || 1],
+    uv: [data.uvX || 0, data.uvY || 0],
+  };
+
+  if (data.mirrorUV) {
+    cube.mirror = true;
+  }
+  if (data.inflate) {
+    cube.inflate = data.inflate;
+  }
+
+  // 构建骨骼
+  const bone: Record<string, any> = {
+    name: data.rootBoneName || 'root',
+    cubes: [cube],
+  };
+
+  if (data.parentBone) {
+    bone.parent = data.parentBone;
+  }
+  bone.pivot = [data.pivotX || 0, data.pivotY || 0, data.pivotZ || 0];
+  if (data.rotationX || data.rotationY || data.rotationZ) {
+    bone.rotation = [data.rotationX || 0, data.rotationY || 0, data.rotationZ || 0];
+  }
+
+  return {
+    format_version: data.formatVersion || '1.21.100',
+    'minecraft:geometry': [
+      {
+        description: {
+          identifier: geoId,
+          texture_width: data.textureWidth || 64,
+          texture_height: data.textureHeight || 64,
+          visible_bounds_width: data.visibleBoundsWidth || 2,
+          visible_bounds_height: data.visibleBoundsHeight || 2,
+          visible_bounds_offset: JSON.parse(data.visibleBoundsOffset || '[0, 0, 0]'),
+        },
+        bones: [bone],
+      },
+    ],
+  };
+}
+
+// ===== 脚本生成器 (script) =====
+function generateScript(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+
+  // 脚本模块生成 manifest 入口信息 + 脚本内容
+  const dependencies: string[] = [];
+  if (data.useServerModule) {
+    dependencies.push('@minecraft/server');
+  }
+  if (data.useServerUiModule) {
+    dependencies.push('@minecraft/server-ui');
+  }
+
+  return {
+    type: 'script',
+    content: data.scriptContent || '',
+    manifest_entry: {
+      type: 'script',
+      language: 'javascript',
+      entry: 'scripts/main.js',
+    },
+    dependencies: dependencies.map((dep) => {
+      if (dep === '@minecraft/server') {
+        return { module_name: '@minecraft/server', version: data.apiVersion || '1.16.0' };
+      }
+      return { module_name: dep, version: '1.0.0' };
+    }),
+  };
+}
+
+// ===== 结构生成器 (structure) =====
+function generateStructure(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = data.namespace || 'pa';
+  const id = data.identifier || 'change_me';
+
+  return {
+    type: 'structure',
+    identifier: `${ns}:${id}`,
+    format_version: '1.21.100',
+    size: [data.sizeX || 5, data.sizeY || 5, data.sizeZ || 5],
+    structure_world_origin: [0, 0, 0],
+    options: {
+      ignore_blocks: data.ignoreBlocks || false,
+      ignore_entities: data.ignoreEntities || false,
+      ignore_water: data.ignoreWater || false,
+      ignore_air: data.ignoreAir || false,
+      include_water: data.includeWater !== false,
+    },
+    transform: {
+      rotation: data.rotation || 'none',
+      mirror: data.mirror || 'none',
+    },
+    palette_mode: data.paletteMode || 'linear',
+  };
+}
+
+// ===== 战利品表生成器 (loot) =====
+function generateLoot(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+
+  // 构建条目
+  const entries: Record<string, any>[] = [];
+
+  // 条目 1
+  const entry1: Record<string, any> = {
+    type: 'item',
+    name: data.item1Id || 'minecraft:stick',
+    weight: data.item1Weight || 1,
+  };
+  const functions1: Record<string, any>[] = [];
+  functions1.push({
+    function: 'set_count',
+    count: { min: data.item1MinCount || 1, max: data.item1MaxCount || 1 },
+  });
+  if (data.item1Enchant) {
+    functions1.push({
+      function: 'enchant_randomly',
+      levels: { min: 1, max: data.item1EnchantLevel || 1 },
+    });
+  }
+  entry1.functions = functions1;
+  entries.push(entry1);
+
+  // 条目 2
+  if (data.useItem2) {
+    const entry2: Record<string, any> = {
+      type: 'item',
+      name: data.item2Id || 'minecraft:iron_ingot',
+      weight: data.item2Weight || 1,
+      functions: [{
+        function: 'set_count',
+        count: { min: data.item2MinCount || 1, max: data.item2MaxCount || 1 },
+      }],
+    };
+    entries.push(entry2);
+  }
+
+  // 构建条件
+  const conditions: Record<string, any>[] = [];
+  if (data.useKilledByPlayer) {
+    conditions.push({ condition: 'killed_by_player' });
+  }
+  if (data.useRandomChance) {
+    conditions.push({ condition: 'random_chance', chance: data.randomChance || 0.5 });
+  }
+  if (data.useLootingEnchant) {
+    conditions.push({ condition: 'random_looting_chance', chance: 0.5, looting_multiplier: 0.1 });
+  }
+
+  // 构建池子
+  const pool: Record<string, any> = {
+    rolls: data.poolRolls || 1,
+    entries,
+  };
+  if (data.poolBonusRolls) {
+    pool.bonus_rolls = data.poolBonusRolls;
+  }
+  if (conditions.length > 0) {
+    pool.conditions = conditions;
+  }
+
+  return {
+    format_version: '1.21.100',
+    pools: [pool],
+  };
+}
+
+// ===== 着色器生成器 (shader) =====
+function generateShader(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+  const data = item.data;
+  const ns = 'pa';
+  const id = data.identifier || 'change_me';
+
+  const material: Record<string, any> = {
+    render_method: data.renderMethod || 'alpha_blend',
+    face_culling: data.faceCulling || 'back',
+  };
+
+  if (data.depthBias) {
+    material.depth_bias = data.depthBias;
+  }
+  if (data.slopeScaledDepthBias) {
+    material.slope_scaled_depth_bias = data.slopeScaledDepthBias;
+  }
+
+  // 纹理采样器
+  const samplers: Record<string, string>[] = [{ sampler: data.textureSamplerName || 'tDiffuse' }];
+  if (data.useNormalMap) samplers.push({ sampler: 'tNormal' });
+  if (data.useEmissiveMap) samplers.push({ sampler: 'tEmissive' });
+  if (data.useMetallicMap) samplers.push({ sampler: 'tMetallic' });
+  if (data.useRoughnessMap) samplers.push({ sampler: 'tRoughness' });
+  material.samplers = samplers;
+
+  // 颜色混合
+  if (data.useColorBlend) {
+    material.blend_color = {
+      src: data.blendSrcColor || 'one',
+      dst: data.blendDstColor || 'one_minus_src_alpha',
+    };
+  }
+
+  // 着色器代码
+  material.fragment_shader = data.fragmentShader || '';
+  material.vertex_shader = data.vertexShader || '';
+
+  // 高级属性
+  material.fog = data.useFog !== false;
+  material.lighting = data.useLighting !== false;
+  material.tone_mapping = data.useToneMapping !== false;
+  if (data.useBloom) {
+    material.bloom = true;
+  }
+
+  return {
+    format_version: '1.21.100',
+    material: {
+      [`${ns}:${id}`]: material,
+    },
+  };
+}
+
 // ===== 主生成函数 =====
 export function generateItemJSON(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
   switch (module.id) {
@@ -1248,6 +1694,26 @@ export function generateItemJSON(module: ModuleDefinition, item: ProjectItem): R
     case 'recall_item':
     case 'soul_stone':
       return generateCustomItem(module, item);
+    case 'function':
+      return generateFunction(module, item);
+    case 'spawn_egg':
+      return generateSpawnEgg(module, item);
+    case 'texture':
+      return generateTexture(module, item);
+    case 'animation':
+      return generateAnimation(module, item);
+    case 'sound':
+      return generateSound(module, item);
+    case 'skin':
+      return generateSkin(module, item);
+    case 'script':
+      return generateScript(module, item);
+    case 'structure':
+      return generateStructure(module, item);
+    case 'loot':
+      return generateLoot(module, item);
+    case 'shader':
+      return generateShader(module, item);
     default:
       return generateItem(module, item);
   }

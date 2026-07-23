@@ -4,11 +4,13 @@
 
 export type FieldType =
   | 'text'        // 文本输入
+  | 'textarea'    // 多行文本
   | 'number'      // 数字输入
   | 'boolean'     // 开关
   | 'select'      // 下拉选择
   | 'icon'        // 图标选择器
   | 'texture'     // 纹理上传
+  | 'tags'        // 标签列表（字符串数组）
   | 'blockList'   // 方块多选
   | 'itemList'    // 物品多选
   | 'repairItems' // 可修复物品列表
@@ -43,6 +45,8 @@ export interface FieldSchema {
   showWhen?: { field: string; value: any };
   // 提示文本
   hint?: string;
+  // 占位符文本
+  placeholder?: string;
   // 是否需要特殊处理
   specialHandler?: string;
   // 图标目录
@@ -56,7 +60,10 @@ export type ModuleCategory =
   | 'custom_items'       // 自定义物品
   | 'custom_entities'    // 自定义实体
   | 'custom_environment' // 自定义环境
-  | 'custom_recipes';    // 自定义配方
+  | 'custom_recipes'     // 自定义配方
+  | 'custom_particles'   // 自定义粒子
+  | 'custom_graphics'    // 自定义图形
+  | 'custom_functions';  // 自定义功能
 
 // JSON 根键类型
 export type JsonRootKey =
@@ -68,7 +75,16 @@ export type JsonRootKey =
   | 'minecraft:recipe_shapeless'
   | 'minecraft:recipe_furnace'
   | 'minecraft:particle_effect'
-  | 'minecraft:spawn_rules';
+  | 'minecraft:spawn_rules'
+  | 'minecraft:geometry'
+  | 'minecraft:function'
+  | 'texture_data'
+  | 'sound_definitions'
+  | 'animations'
+  | 'material'
+  | 'pools'
+  | 'structure'
+  | 'script';
 
 // 生成器类型
 export type GeneratorType =
@@ -80,7 +96,9 @@ export type GeneratorType =
   | 'entity' | 'biome'
   | 'recipe_shaped' | 'recipe_shapeless' | 'recipe_furnace'
   | 'particle' | 'projectile' | 'spawn_rule'
-  | 'music_disc' | 'bundle' | 'recall_item' | 'soul_stone';
+  | 'music_disc' | 'bundle' | 'recall_item' | 'soul_stone'
+  | 'spawn_egg' | 'loot' | 'function' | 'script' | 'structure'
+  | 'animation' | 'sound' | 'texture' | 'shader' | 'skin';
 
 export interface SubType {
   id: string;
@@ -92,6 +110,7 @@ export interface SubType {
 export interface ModuleDefinition {
   id: string;
   name: string;          // 中文名
+  description?: string;  // 模块描述
   icon: string;          // 模块图标 emoji
   category: ModuleCategory;
   templateFile: string;  // 模板文件路径 (相对于 public/assets/)

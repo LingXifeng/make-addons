@@ -137,6 +137,36 @@ function getItemFilePath(module: ModuleDefinition, item: ProjectItem): { behavio
     case 'recipe':
       paths.behavior = `recipes/${id}.json`;
       break;
+    case 'spawn_egg':
+      paths.behavior = `items/${id}.json`;
+      break;
+    case 'loot':
+      paths.behavior = `loot_tables/${id}.json`;
+      break;
+    case 'function':
+      paths.behavior = `functions/${id}.mcfunction`;
+      break;
+    case 'animation':
+      paths.resource = `animations/${id}.animation.json`;
+      break;
+    case 'sound':
+      paths.resource = `sounds/sound_definitions.json`;
+      break;
+    case 'texture':
+      paths.resource = `textures/texture_data.json`;
+      break;
+    case 'skin':
+      paths.resource = `models/entity/${id}.geometry.json`;
+      break;
+    case 'shader':
+      paths.resource = `materials/${id}.material.json`;
+      break;
+    case 'script':
+      paths.behavior = `scripts/${id}.js`;
+      break;
+    case 'structure':
+      paths.behavior = `structures/${id}.mcstructure`;
+      break;
   }
 
   return paths;
@@ -362,6 +392,20 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
       case 'biome':
         lines.push(`biome.${id}.name=${name}`);
         break;
+      case 'spawn_egg':
+        lines.push(`item.${ns}:${id}.name=${name}`);
+        break;
+      case 'animation':
+      case 'sound':
+      case 'texture':
+      case 'skin':
+      case 'shader':
+      case 'function':
+      case 'script':
+      case 'structure':
+      case 'loot':
+        // 这些模块不需要语言文件条目
+        break;
     }
   }
 
@@ -393,7 +437,7 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
   // 检查是否需要脚本模块（装备/武器有药水效果 或 火焰附加）
   const continuousEffects = collectContinuousEffects(allItems);
   const fireAspectItems = collectFireAspectItems(allItems);
-  const hasScript = continuousEffects.length > 0 || fireAspectItems.length > 0;
+  const hasScript = continuousEffects.length > 0 || fireAspectItems.length > 0 || allItems.some(({ module }) => module.id === 'script');
 
   // 行为包 manifest
   files.push({
@@ -411,6 +455,52 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
   for (const { module, item } of allItems) {
     const json = generateItemJSON(module, item);
     const paths = getItemFilePath(module, item);
+
+    // 函数模块：生成 .mcfunction 纯文本文件
+    if (module.id === 'function') {
+      if (paths.behavior) {
+        files.push({
+          path: `behavior_pack/${paths.behavior}`,
+          content: item.data.commands || '',
+        });
+      }
+      // tick/load 函数
+      if (item.data.tickEnabled) {
+        files.push({
+          path: `behavior_pack/functions/tick.json`,
+          content: JSON.stringify({ values: [`pa:${item.data.identifier || 'change_me'}`] }, null, 2),
+        });
+      }
+      if (item.data.loadEnabled) {
+        files.push({
+          path: `behavior_pack/functions/load.json`,
+          content: JSON.stringify({ values: [`pa:${item.data.identifier || 'change_me'}`] }, null, 2),
+        });
+      }
+      continue;
+    }
+
+    // 脚本模块：生成 .js 纯文本文件
+    if (module.id === 'script') {
+      if (paths.behavior) {
+        files.push({
+          path: `behavior_pack/${paths.behavior}`,
+          content: item.data.scriptContent || '',
+        });
+      }
+      continue;
+    }
+
+    // 结构模块：生成占位 .mcstructure 文件
+    if (module.id === 'structure') {
+      if (paths.behavior) {
+        files.push({
+          path: `behavior_pack/${paths.behavior}`,
+          content: JSON.stringify(json, null, 2),
+        });
+      }
+      continue;
+    }
 
     if (paths.behavior) {
       files.push({
@@ -430,6 +520,14 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
       }
     }
 
+    // 资源包模块（animation/sound/texture/skin/shader）
+    if (paths.resource && ['animation', 'sound', 'texture', 'skin', 'shader'].includes(module.id)) {
+      files.push({
+        path: `resource_pack/${paths.resource}`,
+        content: JSON.stringify(json, null, 2),
+      });
+    }
+
     // 合成配方
     const recipeJson = generateRecipeJSON(item, module);
     if (recipeJson) {
@@ -443,7 +541,7 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
 
   // 贴图文件 + item_texture.json 映射
   const textureItems = allItems.filter(({ module }) =>
-    ['weapon', 'armor', 'food', 'tool', 'normal', 'block'].includes(module.id)
+    ['weapon', 'armor', 'food', 'tool', 'normal', 'block', 'spawn_egg'].includes(module.id)
   );
 
   if (textureItems.length > 0) {
