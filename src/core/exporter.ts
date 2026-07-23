@@ -9,6 +9,7 @@ interface AddonFile {
   content: string;
   isBase64?: boolean; // 贴图等二进制文件用 base64 字符串
   iconFetch?: { iconDir: string; icon_name: string }; // 需要异步 fetch 的内置图标
+  fetchUrl?: string; // 需要异步 fetch 的任意资源 URL（相对于 BASE_URL）
 }
 
 // 需要贴图的模块 — 基础物品（minecraft:icon = identifier）
@@ -53,6 +54,7 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
   if (hasScript) {
     modules.push({
       type: 'script',
+      language: 'javascript',
       uuid: generateUUID(),
       version: [1, 0, 0],
       entry: 'scripts/effect_manager.js',
@@ -65,11 +67,17 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
       name: project.name || 'My Addon',
       description: project.description || 'Made with Make Addons',
       uuid: headerUUID,
-      version: [1, 0, 0],
+      version: [0, 0, 1],
       min_engine_version: [1, 21, 0],
     },
     modules,
     dependencies: [],
+    metadata: {
+      authors: ['Make Addons'],
+      generated_with: {
+        make_addons: ['1.0.0'],
+      },
+    },
   };
 
   if (hasScript) {
@@ -102,16 +110,22 @@ function generateResourceManifest(project: Project): string {
       name: project.name || 'My Addon',
       description: project.description || 'Made with Make Addons',
       uuid: headerUUID,
-      version: [1, 0, 0],
+      version: [0, 0, 1],
       min_engine_version: [1, 21, 0],
     },
     modules: [
       {
         type: 'resources',
         uuid: moduleUUID,
-        version: [1, 0, 0],
+        version: [0, 0, 1],
       },
     ],
+    metadata: {
+      authors: ['Make Addons'],
+      generated_with: {
+        make_addons: ['1.0.0'],
+      },
+    },
   };
 
   return JSON.stringify(manifest, null, 2);
@@ -640,6 +654,18 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     });
   }
 
+  // pack_icon.png — 行为包和资源包各一份
+  files.push({
+    path: 'behavior_pack/pack_icon.png',
+    content: '',
+    fetchUrl: 'assets/pack_icon.png',
+  });
+  files.push({
+    path: 'resource_pack/pack_icon.png',
+    content: '',
+    fetchUrl: 'assets/pack_icon.png',
+  });
+
   return files;
 }
 
@@ -664,11 +690,38 @@ export async function exportAsMcaddon(project: Project, modules: ModuleDefinitio
   for (const file of files) {
     if (file.path.startsWith('behavior_pack/')) {
       const relPath = file.path.replace('behavior_pack/', '');
+
+      // 异步 fetch 任意资源（如 pack_icon.png）
+      if (file.fetchUrl && !file.content) {
+        try {
+          const url = `${import.meta.env.BASE_URL}${file.fetchUrl}`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const arrayBuffer = await resp.arrayBuffer();
+            behaviorFolder.file(relPath, arrayBuffer);
+          }
+        } catch {}
+        continue;
+      }
+
       if (relPath && file.content) {
         behaviorFolder.file(relPath, file.content, file.isBase64 ? { base64: true } : undefined);
       }
     } else if (file.path.startsWith('resource_pack/')) {
       const relPath = file.path.replace('resource_pack/', '');
+
+      // 异步 fetch 任意资源（如 pack_icon.png）
+      if (file.fetchUrl && !file.content) {
+        try {
+          const url = `${import.meta.env.BASE_URL}${file.fetchUrl}`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const arrayBuffer = await resp.arrayBuffer();
+            resourceFolder.file(relPath, arrayBuffer);
+          }
+        } catch {}
+        continue;
+      }
 
       // 异步 fetch 内置图标 PNG
       if (file.iconFetch && !file.content) {
