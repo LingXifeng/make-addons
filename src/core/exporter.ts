@@ -21,11 +21,28 @@ function generateUUID(): string {
 }
 
 // 生成行为包 manifest
-function generateBehaviorManifest(project: Project): string {
+function generateBehaviorManifest(project: Project, hasScript = false): string {
   const headerUUID = project.headerUUID || generateUUID();
   const moduleUUID = project.moduleUUID || generateUUID();
 
-  const manifest = {
+  const modules: any[] = [
+    {
+      type: 'data',
+      uuid: moduleUUID,
+      version: [1, 0, 0],
+    },
+  ];
+
+  if (hasScript) {
+    modules.push({
+      type: 'script',
+      uuid: generateUUID(),
+      version: [1, 0, 0],
+      entry: 'scripts/effect_manager.js',
+    });
+  }
+
+  const manifest: Record<string, any> = {
     format_version: 2,
     header: {
       name: project.name || 'My Addon',
@@ -34,15 +51,16 @@ function generateBehaviorManifest(project: Project): string {
       version: [1, 0, 0],
       min_engine_version: [1, 21, 0],
     },
-    modules: [
-      {
-        type: 'data',
-        uuid: moduleUUID,
-        version: [1, 0, 0],
-      },
-    ],
+    modules,
     dependencies: [],
   };
+
+  if (hasScript) {
+    manifest.dependencies.push({
+      module_name: '@minecraft/server',
+      version: '1.13.0',
+    });
+  }
 
   return JSON.stringify(manifest, null, 2);
 }
@@ -112,6 +130,91 @@ function getItemFilePath(module: ModuleDefinition, item: ProjectItem): { behavio
   return paths;
 }
 
+// 收集装备/武器的持续药水效果
+interface ContinuousEffectEntry {
+  itemId: string;       // pa:xxx
+  effects: { effect: string; duration: number; amplifier: number; visible: boolean }[];
+}
+
+function collectContinuousEffects(items: { module: ModuleDefinition; item: ProjectItem }[]): ContinuousEffectEntry[] {
+  const entries: ContinuousEffectEntry[] = [];
+  for (const { module, item } of items) {
+    // 只对 weapon / armor 生成持续效果脚本，food 走 on_consume
+    if (module.id !== 'weapon' && module.id !== 'armor') continue;
+    const data = item.data;
+    if (!data.potionEffectsEnable || !data.potionEffects?.length) continue;
+    const id = `pa:${data.identifier || 'change_me'}`;
+    entries.push({
+      itemId: id,
+      effects: data.potionEffects.map((e: any) => ({
+        effect: e.effect,
+        duration: e.duration,
+        amplifier: e.amplifier || 0,
+        visible: e.visible !== false,
+      })),
+    });
+  }
+  return entries;
+}
+
+// 生成持续药水效果脚本
+function generateEffectScript(entries: ContinuousEffectEntry[]): string {
+  const effectMap = entries.map(e => {
+    const effectsStr = e.effects.map(ef =>
+      `    "${ef.effect}": { duration: ${(ef.duration || 10) + 3}, amplifier: ${ef.amplifier || 0}, showParticles: ${ef.visible} }`
+    ).join(',\n');
+    return `  "${e.itemId}": {\n${effectsStr}\n  }`;
+  }).join(',\n');
+
+  return `// 持续药水效果脚本 — 由 Make Addons 生成
+// 装备/武器上的药水效果在手持或穿戴时持续生效
+import { world, system } from "@minecraft/server";
+
+const EFFECT_MAP = {
+${effectMap}
+};
+
+// 每 20 tick (1秒) 检查一次
+system.runInterval(() => {
+  for (const player of world.getAllPlayers()) {
+    try {
+      // 检查主手和副手
+      const inv = player.getComponent("minecraft:inventory");
+      if (inv) {
+        const mainHand = inv.itemHeld;
+        if (mainHand && EFFECT_MAP[mainHand.typeId]) {
+          applyEffects(player, EFFECT_MAP[mainHand.typeId]);
+        }
+      }
+      // 检查装备栏 (头盔/胸甲/护腿/靴子)
+      const equippable = player.getComponent("minecraft:equippable");
+      if (equippable) {
+        for (const slot of ["Head", "Chest", "Legs", "Feet"]) {
+          try {
+            const item = equippable.getEquipmentSlot(slot);
+            if (item && EFFECT_MAP[item.typeId]) {
+              applyEffects(player, EFFECT_MAP[item.typeId]);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+}, 20);
+
+function applyEffects(player, effects) {
+  for (const [effectId, opts] of Object.entries(effects)) {
+    try {
+      player.addEffect(effectId, opts.duration, {
+        amplifier: opts.amplifier,
+        showParticles: opts.showParticles,
+      });
+    } catch {}
+  }
+}
+`;
+}
+
 // 生成语言文件
 function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectItem }[]): string {
   const lines: string[] = [];
@@ -146,10 +249,23 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
 export function generateAddonFiles(project: Project, modules: ModuleDefinition[]): AddonFile[] {
   const files: AddonFile[] = [];
 
+  // 收集所有项目
+  const allItems: { module: ModuleDefinition; item: ProjectItem }[] = [];
+  for (const module of modules) {
+    const items = project.items[module.id] || [];
+    for (const item of items) {
+      allItems.push({ module, item });
+    }
+  }
+
+  // 检查是否需要脚本模块（装备/武器有药水效果）
+  const continuousEffects = collectContinuousEffects(allItems);
+  const hasScript = continuousEffects.length > 0;
+
   // 行为包 manifest
   files.push({
     path: 'behavior_pack/manifest.json',
-    content: generateBehaviorManifest(project),
+    content: generateBehaviorManifest(project, hasScript),
   });
 
   // 资源包 manifest
@@ -163,15 +279,6 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     path: 'behavior_pack/pack_icon.png',
     content: '', // Will be handled separately
   });
-
-  // 收集所有项目
-  const allItems: { module: ModuleDefinition; item: ProjectItem }[] = [];
-  for (const module of modules) {
-    const items = project.items[module.id] || [];
-    for (const item of items) {
-      allItems.push({ module, item });
-    }
-  }
 
   // 生成每个项目的 JSON 文件
   for (const { module, item } of allItems) {
@@ -211,6 +318,14 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     files.push({
       path: 'resource_pack/texts/languages.json',
       content: JSON.stringify(['zh_CN', 'en_US'], null, 2),
+    });
+  }
+
+  // 持续药水效果脚本 (装备/武器)
+  if (continuousEffects.length > 0) {
+    files.push({
+      path: 'behavior_pack/scripts/effect_manager.js',
+      content: generateEffectScript(continuousEffects),
     });
   }
 

@@ -432,30 +432,34 @@ function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: a
               <option key={ef} value={ef}>{ef}</option>
             ))}
           </select>
-          <input
-            type="number"
-            value={effect.amplifier ?? 0}
-            min={0}
-            max={255}
-            placeholder="等级"
-            onChange={e => {
-              const newValue = [...value];
-              newValue[i] = { ...effect, amplifier: parseInt(e.target.value) || 0 };
-              onChange(newValue);
-            }}
-          />
-          <input
-            type="number"
-            value={effect.duration ?? 10}
-            min={0}
-            step={0.1}
-            placeholder="持续时间(秒)"
-            onChange={e => {
-              const newValue = [...value];
-              newValue[i] = { ...effect, duration: parseFloat(e.target.value) || 0 };
-              onChange(newValue);
-            }}
-          />
+          <label className="potion-effect-label">
+            <span>等级</span>
+            <input
+              type="number"
+              value={effect.amplifier ?? 0}
+              min={0}
+              max={255}
+              onChange={e => {
+                const newValue = [...value];
+                newValue[i] = { ...effect, amplifier: parseInt(e.target.value) || 0 };
+                onChange(newValue);
+              }}
+            />
+          </label>
+          <label className="potion-effect-label">
+            <span>秒数</span>
+            <input
+              type="number"
+              value={effect.duration ?? 10}
+              min={0}
+              step={0.1}
+              onChange={e => {
+                const newValue = [...value];
+                newValue[i] = { ...effect, duration: parseFloat(e.target.value) || 0 };
+                onChange(newValue);
+              }}
+            />
+          </label>
           <label className="potion-effect-visible">
             <input
               type="checkbox"

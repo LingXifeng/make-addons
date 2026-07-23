@@ -68,7 +68,7 @@ export const weaponFields: FieldSchema[] = [
   { key: 'diggerBlocks', label: '挖掘方块列表', type: 'repairItems', defaultValue: [], section: '方块交互', showWhen: { field: 'diggerEnable', value: true } },
 
   // --- 高级属性 ---
-  { key: 'potionEffectsEnable', label: '药水效果', type: 'boolean', defaultValue: false, section: '高级属性', hint: '使用物品时给予药水效果' },
+  { key: 'potionEffectsEnable', label: '药水效果', type: 'boolean', defaultValue: false, section: '高级属性', hint: '手持或穿戴时持续生效' },
   { key: 'potionEffects', label: '效果列表', type: 'potionEffects', defaultValue: [], section: '高级属性', showWhen: { field: 'potionEffectsEnable', value: true } },
   { key: 'onUseEnable', label: '使用行为', type: 'boolean', defaultValue: false, section: '高级属性', hint: '物品使用时触发事件' },
   { key: 'onUseEvent', label: '使用事件名称', type: 'text', defaultValue: 'on_use_event', section: '高级属性', showWhen: { field: 'onUseEnable', value: true } },

@@ -802,7 +802,19 @@ body {
 }
 
 .potion-effect-row input[type="number"] {
-  width: 70px;
+  width: 55px;
+}
+
+.potion-effect-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.potion-effect-label span {
+  white-space: nowrap;
 }
 
 .potion-effect-visible {

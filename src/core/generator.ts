@@ -141,7 +141,9 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
   }
 
   // 药水效果
-  if (data.potionEffectsEnable && data.potionEffects?.length > 0) {
+  // 食物：通过 on_consume 事件在食用时触发
+  // 装备/武器：不在此处理，由导出器生成脚本实现持续生效（手持/穿戴时一直有效）
+  if (module.id === 'food' && data.potionEffectsEnable && data.potionEffects?.length > 0) {
     const effects: Record<string, any> = {};
     for (const eff of data.potionEffects) {
       effects[eff.effect] = {

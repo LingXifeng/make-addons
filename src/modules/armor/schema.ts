@@ -55,6 +55,8 @@ export const armorFields: FieldSchema[] = [
   { key: 'dispensableEnable', label: '可发射器发射', type: 'boolean', defaultValue: false, section: '高级属性' },
   { key: 'onUseEnable', label: '使用行为', type: 'boolean', defaultValue: false, section: '高级属性' },
   { key: 'onUseEvent', label: '使用事件名称', type: 'text', defaultValue: 'on_use_event', section: '高级属性', showWhen: { field: 'onUseEnable', value: true } },
+  { key: 'potionEffectsEnable', label: '药水效果', type: 'boolean', defaultValue: false, section: '高级属性', hint: '穿戴时持续生效' },
+  { key: 'potionEffects', label: '效果列表', type: 'potionEffects', defaultValue: [], section: '高级属性', showWhen: { field: 'potionEffectsEnable', value: true } },
 ];
 
 // ===== 护甲模块定义 =====
