@@ -43,13 +43,17 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
   const ns = 'pa'; // namespace
   const identifier = `${ns}:${data.identifier || 'change_me'}`;
 
+  // 使用 schema 默认值作为后备
+  const menuCategoryField = module.fields.find(f => f.key === 'menuCategory');
+  const menuCategoryValue = data.menuCategory ?? (menuCategoryField?.defaultValue || 'none');
+
   const result: Record<string, any> = {
     format_version: '1.21.100',
     'minecraft:item': {
       description: {
         identifier,
         menu_category: {
-          category: data.menuCategory || 'none',
+          category: menuCategoryValue,
         },
       },
       components: {} as Record<string, any>,
@@ -835,13 +839,17 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
   const ns = 'pa';
   const identifier = `${ns}:${data.identifier || 'change_me'}`;
 
+  // 使用 schema 默认值作为后备
+  const menuCategoryField = module.fields.find(f => f.key === 'menuCategory');
+  const menuCategoryValue = data.menuCategory ?? (menuCategoryField?.defaultValue || 'items');
+
   const result: Record<string, any> = {
     format_version: '1.21.100',
     'minecraft:item': {
       description: {
         identifier,
         menu_category: {
-          category: data.menuCategory || 'items',
+          category: menuCategoryValue,
         },
       },
       components: {} as Record<string, any>,
@@ -1116,12 +1124,6 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
     components['minecraft:fire_resistant'] = { value: true };
   }
 
-  if (data.menuCategory) {
-    components['minecraft:menu_category'] = {
-      category: data.menuCategory,
-    };
-  }
-
   if (data.tags?.length) {
     components['minecraft:tags'] = { tags: data.tags };
   }
@@ -1226,14 +1228,22 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
     };
   }
 
+  // menu_category 使用 schema 默认值 + itemGroup
+  const mcField = module.fields.find(f => f.key === 'menuCategory');
+  const mcValue = data.menuCategory ?? (mcField?.defaultValue || 'items');
+  const igField = module.fields.find(f => f.key === 'itemGroup');
+  const igValue = data.itemGroup ?? igField?.defaultValue;
+  const menuCategory: Record<string, any> = { category: mcValue };
+  if (igValue && igValue !== '') {
+    menuCategory.group = igValue;
+  }
+
   return {
     format_version: '1.21.100',
     'minecraft:item': {
       description: {
         identifier: `${ns}:${id}`,
-        menu_category: {
-          category: data.menuCategory || 'items',
-        },
+        menu_category: menuCategory,
       },
       components,
     },
@@ -1257,7 +1267,7 @@ function generateFunction(_module: ModuleDefinition, item: ProjectItem): Record<
 }
 
 // ===== 生怪蛋生成器 (spawn_egg) =====
-function generateSpawnEgg(_module: ModuleDefinition, item: ProjectItem): Record<string, any> {
+function generateSpawnEgg(module: ModuleDefinition, item: ProjectItem): Record<string, any> {
   const data = item.data;
   const ns = 'pa';
   const id = data.identifier || 'change_me';
@@ -1291,13 +1301,17 @@ function generateSpawnEgg(_module: ModuleDefinition, item: ProjectItem): Record<
     components['minecraft:aliases'] = data.aliases;
   }
 
+  // menu_category 使用 schema 默认值
+  const spawnMcField = module.fields.find(f => f.key === 'menuCategory');
+  const spawnMcValue = data.menuCategory ?? (spawnMcField?.defaultValue || 'nature');
+
   return {
     format_version: '1.21.100',
     'minecraft:item': {
       description: {
         identifier,
         menu_category: {
-          category: data.menuCategory || 'nature',
+          category: spawnMcValue,
         },
       },
       components,
