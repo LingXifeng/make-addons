@@ -79,7 +79,6 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
 function generateResourceManifest(project: Project): string {
   const headerUUID = project.resourceHeaderUUID || generateUUID();
   const moduleUUID = project.resourceModuleUUID || generateUUID();
-  const behaviorUUID = project.headerUUID || '';
 
   const manifest: Record<string, any> = {
     format_version: 2,
@@ -98,15 +97,6 @@ function generateResourceManifest(project: Project): string {
       },
     ],
   };
-
-  if (behaviorUUID) {
-    manifest.dependencies = [
-      {
-        uuid: behaviorUUID,
-        version: [1, 0, 0],
-      },
-    ];
-  }
 
   return JSON.stringify(manifest, null, 2);
 }
@@ -243,25 +233,21 @@ ${effectMap}
 system.runInterval(() => {
   for (const player of world.getAllPlayers()) {
     try {
-      // 检查主手和副手
-      const inv = player.getComponent("minecraft:inventory");
-      if (inv) {
-        const mainHand = inv.itemHeld;
-        if (mainHand && EFFECT_MAP[mainHand.typeId]) {
-          applyEffects(player, EFFECT_MAP[mainHand.typeId]);
-        }
+      const equippable = player.getComponent("minecraft:equippable");
+      if (!equippable) continue;
+      // 检查主手
+      const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();
+      if (mainHand && EFFECT_MAP[mainHand.typeId]) {
+        applyEffects(player, EFFECT_MAP[mainHand.typeId]);
       }
       // 检查装备栏 (头盔/胸甲/护腿/靴子)
-      const equippable = player.getComponent("minecraft:equippable");
-      if (equippable) {
-        for (const slot of ["Head", "Chest", "Legs", "Feet"]) {
-          try {
-            const item = equippable.getEquipmentSlot(slot);
-            if (item && EFFECT_MAP[item.typeId]) {
-              applyEffects(player, EFFECT_MAP[item.typeId]);
-            }
-          } catch {}
-        }
+      for (const slot of [EquipmentSlot.Head, EquipmentSlot.Chest, EquipmentSlot.Legs, EquipmentSlot.Feet]) {
+        try {
+          const item = equippable.getEquipmentSlot(slot).getItem();
+          if (item && EFFECT_MAP[item.typeId]) {
+            applyEffects(player, EFFECT_MAP[item.typeId]);
+          }
+        } catch {}
       }
     } catch {}
   }
@@ -292,9 +278,9 @@ world.afterEvents.entityHurt.subscribe((event) => {
     const victim = event.hurtEntity;
     if (!attacker || !victim) return;
 
-    const inv = attacker.getComponent("minecraft:inventory");
-    if (!inv) return;
-    const mainHand = inv.itemHeld;
+    const equippable = attacker.getComponent("minecraft:equippable");
+    if (!equippable) return;
+    const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();
     if (!mainHand) return;
 
     const seconds = FIRE_ASPECT_MAP[mainHand.typeId];
@@ -308,7 +294,7 @@ world.afterEvents.entityHurt.subscribe((event) => {
   const parts = ['// 脚本 — 由 Make Addons 生成'];
   if (hasEffects) parts.push('// 持续药水效果：装备/武器上的药水效果在手持或穿戴时持续生效');
   if (hasFireAspect) parts.push('// 火焰附加：攻击生物时使其着火');
-  parts.push('import { world, system } from "@minecraft/server";');
+  parts.push('import { world, system, EquipmentSlot } from "@minecraft/server";');
   parts.push(effectScript + fireAspectScript);
 
   return parts.join('\n');
@@ -397,6 +383,16 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
       case 'food':
       case 'tool':
       case 'normal':
+      case 'bow':
+      case 'crossbow':
+      case 'shield':
+      case 'mace':
+      case 'arrow':
+      case 'music_disc':
+      case 'bundle':
+      case 'recall_item':
+      case 'soul_stone':
+      case 'spawn_egg':
         lines.push(`item.${ns}:${id}.name=${name}`);
         break;
       case 'block':
@@ -407,9 +403,6 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
         break;
       case 'biome':
         lines.push(`biome.${id}.name=${name}`);
-        break;
-      case 'spawn_egg':
-        lines.push(`item.${ns}:${id}.name=${name}`);
         break;
       case 'animation':
       case 'sound':
@@ -425,7 +418,7 @@ function generateLanguageFile(items: { module: ModuleDefinition; item: ProjectIt
     }
   }
 
-  return lines.join('\n');
+  return lines.join('\n') + '\n';
 }
 
 // 生成所有文件
