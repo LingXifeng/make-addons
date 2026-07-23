@@ -70,7 +70,7 @@ export async function generateItemJson(
   const fields = subType?.fields || module.fields;
 
   // 加载模板
-  const response = await fetch(`/assets/${templateFile}`);
+  const response = await fetch(`${import.meta.env.BASE_URL}assets/${templateFile}`);
   const template = await response.json();
 
   // 深拷贝模板

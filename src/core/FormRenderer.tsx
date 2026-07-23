@@ -169,7 +169,7 @@ function IconPicker({ value, onChange, iconDir, onTextureUpload, customTexture }
 
   useEffect(() => {
     // 加载图标清单
-    fetch('/assets/icon_manifest.json')
+    fetch(`${import.meta.env.BASE_URL}assets/icon_manifest.json`)
       .then(r => r.json())
       .then((manifest: Record<string, string[]>) => {
         const result: { name: string; path: string }[] = [];

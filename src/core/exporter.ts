@@ -38,7 +38,7 @@ export async function generateAddon(project: { name: string; namespace: string; 
   // 加载图标清单
   let iconManifest: Record<string, string[]> = {};
   try {
-    const response = await fetch('/assets/icon_manifest.json');
+    const response = await fetch(`${import.meta.env.BASE_URL}assets/icon_manifest.json`);
     iconManifest = await response.json();
   } catch (e) {
     // 清单加载失败，继续处理
@@ -87,7 +87,7 @@ export async function generateAddon(project: { name: string; namespace: string; 
       const iconPath = findIconPath(iconDir, iconName);
       if (iconPath) {
         try {
-          const response = await fetch(`/assets/${iconPath}`);
+          const response = await fetch(`${import.meta.env.BASE_URL}assets/${iconPath}`);
           if (response.ok) {
             const blob = await response.blob();
             rpTextures.file(`${textureName}.png`, blob);
