@@ -191,6 +191,7 @@ export function App() {
                 iconDir={selectedModule.iconDir}
                 onTextureUpload={handleTextureUpload}
                 customTexture={selectedItem.customTexture}
+                moduleId={selectedModule.id}
               />
             </>
           ) : (

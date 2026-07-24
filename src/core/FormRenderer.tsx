@@ -9,9 +9,10 @@ interface FormRendererProps {
   iconDir?: string;
   onTextureUpload?: (file: File) => void;
   customTexture?: { name: string; dataUrl: string };
+  moduleId?: string;
 }
 
-export function FormRenderer({ fields, data, onChange, iconDir, onTextureUpload, customTexture }: FormRendererProps) {
+export function FormRenderer({ fields, data, onChange, iconDir, onTextureUpload, customTexture, moduleId }: FormRendererProps) {
   // 按分组组织字段
   const sections: Record<string, FieldSchema[]> = {};
   for (const field of fields) {
@@ -36,6 +37,7 @@ export function FormRenderer({ fields, data, onChange, iconDir, onTextureUpload,
                 iconDir={iconDir || field.iconDir}
                 onTextureUpload={onTextureUpload}
                 customTexture={customTexture}
+                moduleId={moduleId}
               />
             ))}
           </div>
@@ -45,7 +47,7 @@ export function FormRenderer({ fields, data, onChange, iconDir, onTextureUpload,
   );
 }
 
-function FieldInput({ field, value, data, onChange, iconDir, onTextureUpload, customTexture }: {
+function FieldInput({ field, value, data, onChange, iconDir, onTextureUpload, customTexture, moduleId }: {
   field: FieldSchema;
   value: any;
   data: Record<string, any>;
@@ -53,6 +55,7 @@ function FieldInput({ field, value, data, onChange, iconDir, onTextureUpload, cu
   iconDir?: string;
   onTextureUpload?: (file: File) => void;
   customTexture?: { name: string; dataUrl: string };
+  moduleId?: string;
 }) {
   if (!shouldShowField(field, data)) return null;
 
@@ -249,6 +252,7 @@ function renderControl(
         <PotionEffectsInput
           value={value || []}
           onChange={v => onChange(field.key, v)}
+          showDuration={moduleId === 'food'}
         />
       );
 
@@ -444,9 +448,12 @@ const POTION_EFFECTS = [
   'slow_falling', 'bad_omen', 'hero_of_the_village',
 ];
 
-function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: any[]) => void }) {
+function PotionEffectsInput({ value, onChange, showDuration = true }: { value: any[]; onChange: (v: any[]) => void; showDuration?: boolean }) {
   return (
     <div className="potion-effects-input">
+      {!showDuration && (
+        <p style={{ color: '#888', fontSize: '0.85em', margin: '0 0 8px' }}>手持/穿戴时永久生效，无需设置秒数</p>
+      )}
       {value.map((effect, i) => (
         <div key={i} className="potion-effect-row">
           <select
@@ -475,6 +482,7 @@ function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: a
               }}
             />
           </label>
+          {showDuration && (
           <label className="potion-effect-label">
             <span>秒数</span>
             <input
@@ -489,6 +497,7 @@ function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: a
               }}
             />
           </label>
+          )}
           <label className="potion-effect-visible">
             <input
               type="checkbox"
