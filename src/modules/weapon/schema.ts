@@ -53,7 +53,7 @@ export const weaponFields: FieldSchema[] = [
   { key: 'liquidClipped', label: '液体裁剪', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:liquid_clipped', hint: '物品在液体中是否可使用' },
   { key: 'despawn', label: '消失', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:despawn', hint: '掉落后是否会消失' },
   { key: 'shouldDespawnToChat', label: '消失到聊天', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:should_despawn_to_chat' },
-  { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', defaultValue: false, section: '通用属性', jsonPath: 'components.minecraft:can_destroy_in_creative' },
+  { key: 'canDestroyInCreative', label: '创造模式可破坏', type: 'boolean', defaultValue: true, section: '通用属性', jsonPath: 'components.minecraft:can_destroy_in_creative' },
 
   // --- 交互属性 ---
   { key: 'repairableEnable', label: '启用可修复', type: 'boolean', defaultValue: false, section: '交互属性' },

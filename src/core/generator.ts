@@ -310,6 +310,19 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     components['minecraft:fire_resistant'] = {};
   }
 
+  // minecraft:tags — 与 MAM 参考实现一致
+  // 药水效果/火焰附加标记标签，用于标识物品具有持续效果
+  const effectTags: string[] = [];
+  if (data.potionEffectsEnable && data.potionEffects?.length > 0) {
+    effectTags.push('pa:has_continuous_effects');
+  }
+  if (data.fireAspectEnable) {
+    effectTags.push('pa:fire_aspect');
+  }
+  if (effectTags.length > 0) {
+    components['minecraft:tags'] = { tags: effectTags };
+  }
+
   // 标签
   if (data.tags) {
     const tags = data.tags.split(',').map((t: string) => t.trim()).filter(Boolean);

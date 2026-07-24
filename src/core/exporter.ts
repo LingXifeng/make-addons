@@ -86,6 +86,15 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
     });
   }
 
+  // 添加资源包 UUID 依赖 — 确保资源包随行为包自动加载
+  const resourceHeaderUUID = project.resourceHeaderUUID;
+  if (resourceHeaderUUID) {
+    manifest.dependencies.push({
+      uuid: resourceHeaderUUID,
+      version: [1, 0, 0],
+    });
+  }
+
   return JSON.stringify(manifest, null, 2);
 }
 
@@ -264,12 +273,12 @@ function generateEffectScript(continuousEntries: ContinuousEffectEntry[], fireAs
   const hasContinuous = continuousEntries.length > 0;
   const hasFireAspect = fireAspectEntries.length > 0;
 
-  // 构建脚本各部分
+  // 构建脚本各部分 — 与 MAM 参考实现完全一致
   const parts: string[] = [
-    '// 效果管理脚本 — 由 Make Addons 生成',
+    '// 脚本 — 由 Make Addons 生成',
     '// 持续药水效果：装备/武器上的药水效果在手持或穿戴时持续生效',
     '// 火焰附加：攻击生物时使其着火',
-    'import { world, system } from "@minecraft/server";',
+    'import { world, system, EquipmentSlot } from "@minecraft/server";',
     '',
   ];
 
@@ -279,38 +288,37 @@ function generateEffectScript(continuousEntries: ContinuousEffectEntry[], fireAs
       effectMapStr,
       '};',
       '',
-      '// 每 10 tick (0.5秒) 刷新一次，showParticles=false 避免粒子刷屏',
+      '// 每 20 tick (1秒) 检查一次',
       'system.runInterval(() => {',
       '  for (const player of world.getAllPlayers()) {',
       '    try {',
-      '      // 检查主手武器',
-      '      const inv = player.getComponent("minecraft:inventory");',
-      '      if (inv) {',
-      '        const mainHand = inv.itemHeld;',
-      '        if (mainHand && EFFECT_MAP[mainHand.typeId]) {',
-      '          applyEffects(player, EFFECT_MAP[mainHand.typeId]);',
-      '        }',
+      '      const equippable = player.getComponent("minecraft:equippable");',
+      '      if (!equippable) continue;',
+      '      // 检查主手',
+      '      const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();',
+      '      if (mainHand && EFFECT_MAP[mainHand.typeId]) {',
+      '        applyEffects(player, EFFECT_MAP[mainHand.typeId]);',
       '      }',
       '      // 检查装备栏 (头盔/胸甲/护腿/靴子)',
-      '      const equippable = player.getComponent("minecraft:equippable");',
-      '      if (equippable) {',
-      '        for (const slot of ["Head", "Chest", "Legs", "Feet"]) {',
-      '          try {',
-      '            const item = equippable.getEquipmentSlot(slot);',
-      '            if (item && EFFECT_MAP[item.typeId]) {',
-      '              applyEffects(player, EFFECT_MAP[item.typeId]);',
-      '            }',
-      '          } catch {}',
-      '        }',
+      '      for (const slot of [EquipmentSlot.Head, EquipmentSlot.Chest, EquipmentSlot.Legs, EquipmentSlot.Feet]) {',
+      '        try {',
+      '          const item = equippable.getEquipmentSlot(slot).getItem();',
+      '          if (item && EFFECT_MAP[item.typeId]) {',
+      '            applyEffects(player, EFFECT_MAP[item.typeId]);',
+      '          }',
+      '        } catch {}',
       '      }',
       '    } catch {}',
       '  }',
-      '}, 10);',
+      '}, 20);',
       '',
       'function applyEffects(player, effects) {',
       '  for (const [effectId, opts] of Object.entries(effects)) {',
       '    try {',
-      '      player.addEffect(effectId, opts.duration, { amplifier: opts.amplifier, showParticles: false });',
+      '      player.addEffect(effectId, opts.duration, {',
+      '        amplifier: opts.amplifier,',
+      '        showParticles: opts.showParticles,',
+      '      });',
       '    } catch {}',
       '  }',
       '}',
@@ -331,9 +339,9 @@ function generateEffectScript(continuousEntries: ContinuousEffectEntry[], fireAs
       '    const victim = event.hurtEntity;',
       '    if (!attacker || !victim) return;',
       '',
-      '    const inv = attacker.getComponent("minecraft:inventory");',
-      '    if (!inv) return;',
-      '    const mainHand = inv.itemHeld;',
+      '    const equippable = attacker.getComponent("minecraft:equippable");',
+      '    if (!equippable) return;',
+      '    const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();',
       '    if (!mainHand) return;',
       '',
       '    const seconds = FIRE_ASPECT_MAP[mainHand.typeId];',
