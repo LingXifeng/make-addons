@@ -64,7 +64,7 @@ function FieldInput({ field, value, data, onChange, iconDir, onTextureUpload, cu
       <label className="field-label">{field.label}</label>
       {field.hint && <span className="field-hint">{field.hint}</span>}
       <div className="field-control">
-        {renderControl(field, value, data, onChange, iconDir, onTextureUpload, customTexture)}
+        {renderControl(field, value, data, onChange, iconDir, onTextureUpload, customTexture, moduleId)}
       </div>
     </div>
   );
@@ -78,6 +78,7 @@ function renderControl(
   iconDir?: string,
   onTextureUpload?: (file: File) => void,
   customTexture?: { name: string; dataUrl: string },
+  moduleId?: string,
 ) {
   switch (field.type) {
     case 'text':
