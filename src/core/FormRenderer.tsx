@@ -465,8 +465,8 @@ function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: a
             <span>等级</span>
             <input
               type="number"
-              value={effect.amplifier ?? 0}
-              min={0}
+              value={effect.amplifier ?? 1}
+              min={1}
               max={255}
               onChange={e => {
                 const newValue = [...value];
@@ -504,7 +504,7 @@ function PotionEffectsInput({ value, onChange }: { value: any[]; onChange: (v: a
           <button onClick={() => onChange(value.filter((_, j) => j !== i))}>删除</button>
         </div>
       ))}
-      <button onClick={() => onChange([...value, { effect: 'speed', amplifier: 0, duration: 10, visible: true }])}>
+      <button onClick={() => onChange([...value, { effect: 'speed', amplifier: 1, duration: 10, visible: true }])}>
         + 添加药水效果
       </button>
     </div>

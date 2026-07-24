@@ -174,7 +174,7 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     for (const eff of data.potionEffects) {
       effects[eff.effect] = {
         duration: eff.duration,
-        amplifier: eff.amplifier || 0,
+        amplifier: Math.max(0, (eff.amplifier || 1) - 1),
       };
     }
     components['minecraft:food'] = components['minecraft:food'] || {};
