@@ -54,7 +54,6 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
   if (hasScript) {
     modules.push({
       type: 'script',
-      language: 'javascript',
       uuid: generateUUID(),
       version: [1, 0, 0],
       entry: 'scripts/effect_manager.js',
@@ -84,15 +83,6 @@ function generateBehaviorManifest(project: Project, hasScript = false): string {
     manifest.dependencies.push({
       module_name: '@minecraft/server',
       version: '1.13.0',
-    });
-  }
-
-  // 依赖资源包（确保两个包同时加载）
-  const resourceUUID = project.resourceHeaderUUID || '';
-  if (resourceUUID) {
-    manifest.dependencies.push({
-      uuid: resourceUUID,
-      version: [1, 0, 0],
     });
   }
 
@@ -320,11 +310,7 @@ function generateEffectScript(continuousEntries: ContinuousEffectEntry[], fireAs
       'function applyEffects(player, effects) {',
       '  for (const [effectId, opts] of Object.entries(effects)) {',
       '    try {',
-      '      const existing = player.getEffect(effectId);',
-      '      // 只在效果不存在或剩余<3秒时才刷新，避免 addEffect 移除→重加造成真空期闪烁',
-      '      if (!existing || existing.duration < 3) {',
-      '        player.addEffect(effectId, opts.duration, { amplifier: opts.amplifier, showParticles: false });',
-      '      }',
+      '      player.addEffect(effectId, opts.duration, { amplifier: opts.amplifier, showParticles: false });',
       '    } catch {}',
       '  }',
       '}',
