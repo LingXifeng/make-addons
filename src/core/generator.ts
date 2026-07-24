@@ -81,9 +81,9 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     // 特殊字段处理
     if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup') continue;
 
-    // rarity 需要包装为 {value: ...} 格式
+    // rarity 使用裸字符串格式（与 MAM 一致）
     if (field.key === 'rarity') {
-      components['minecraft:rarity'] = { value };
+      components['minecraft:rarity'] = value;
       continue;
     }
 
@@ -94,9 +94,9 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     }
   }
 
-  // fireResistant 需要包装为 {value: true} 格式
+  // fireResistant 使用空对象格式（与 MAM 一致）
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = { value: true };
+    components['minecraft:fire_resistant'] = {};
   }
 
   // --- 特殊组件处理 ---
@@ -307,7 +307,7 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
 
   // 耐火
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = { value: true };
+    components['minecraft:fire_resistant'] = {};
   }
 
   // 标签
@@ -875,9 +875,9 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
 
     if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup' || field.key === 'normalType') continue;
 
-    // rarity 需要包装为 {value: ...} 格式
+    // rarity 使用裸字符串格式（与 MAM 一致）
     if (field.key === 'rarity') {
-      components['minecraft:rarity'] = { value };
+      components['minecraft:rarity'] = value;
       continue;
     }
 
@@ -912,7 +912,7 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
 
   // --- 耐火 ---
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = { value: true };
+    components['minecraft:fire_resistant'] = {};
   }
 
   // --- 标签 ---
@@ -1117,11 +1117,11 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
   }
 
   if (data.rarity) {
-    components['minecraft:rarity'] = { value: data.rarity };
+    components['minecraft:rarity'] = data.rarity;
   }
 
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = { value: true };
+    components['minecraft:fire_resistant'] = {};
   }
 
   if (data.tags?.length) {
