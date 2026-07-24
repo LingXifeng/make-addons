@@ -323,7 +323,7 @@ function generateEffectScript(continuousEntries: ContinuousEffectEntry[], fireAs
       '      const last = effectLastApply[key] || 0;',
       '      // 只在距上次施加 >= (duration-3) 秒时才刷新，避免计时器闪烁',
       '      if (now - last >= (opts.duration - 3) * 1000) {',
-      '        player.addEffect(effectId, opts.duration, {',
+      '        player.addEffect(effectId, opts.duration * 20, {',
       '          amplifier: Math.max(0, opts.amplifier - 1),',
       '          showParticles: opts.showParticles,',
       '        });',

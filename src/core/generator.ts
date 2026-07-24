@@ -173,7 +173,7 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     const effects: Record<string, any> = {};
     for (const eff of data.potionEffects) {
       effects[eff.effect] = {
-        duration: eff.duration,
+        duration: eff.duration * 20,
         amplifier: Math.max(0, (eff.amplifier || 1) - 1),
       };
     }
