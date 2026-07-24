@@ -252,67 +252,108 @@ function collectFireAspectItems(items: { module: ModuleDefinition; item: Project
   return entries;
 }
 
-// 生成持续药水效果的 mcfunction 文件（替代脚本方案，每 tick 执行无缝刷新）
-function generateEffectMcfunctions(entries: ContinuousEffectEntry[]): { files: AddonFile[]; tickValues: string[] } {
-  const files: AddonFile[] = [];
-  const tickValues: string[] = [];
+// 生成效果管理脚本（持续药水效果 + 火焰附加，统一用脚本 API，避免 hasitem 选择器对自定义物品不可靠的问题）
+function generateEffectScript(continuousEntries: ContinuousEffectEntry[], fireAspectEntries: FireAspectEntry[]): string {
+  if (continuousEntries.length === 0 && fireAspectEntries.length === 0) return '';
 
-  for (const entry of entries) {
-    const itemId = entry.itemId; // e.g., "pa:fire_sword"
-    const funcName = `${itemId.replace(':', '_')}_effect`; // e.g., "pa_fire_sword_effect"
-    const funcRef = `pa:${funcName}`;
-
-    // 生成命令 — 每 tick 执行，duration=1 保证无缝刷新
-    const lines: string[] = [`# ${funcRef} — 由 Make Addons 生成（每 tick 执行）`];
-    for (const eff of entry.effects) {
-      const hideParticles = eff.visible ? 'false' : 'true';
-      lines.push(`effect @e[hasitem={item=${itemId},location=${entry.location}}] ${eff.effect} 1 ${eff.amplifier || 0} ${hideParticles}`);
-    }
-
-    files.push({
-      path: `behavior_pack/functions/pa/${funcName}.mcfunction`,
-      content: lines.join('\n') + '\n',
-    });
-    tickValues.push(funcRef);
+  // 持续药水效果 MAP
+  const effectMapEntries: string[] = [];
+  for (const entry of continuousEntries) {
+    const effectsInner = entry.effects.map(e =>
+      `    "${e.effect}": { duration: ${Math.max(e.duration || 13, 13)}, amplifier: ${e.amplifier || 0}, showParticles: ${e.visible !== false} }`
+    ).join(',\n');
+    effectMapEntries.push(`  "${entry.itemId}": {\n${effectsInner}\n  }`);
   }
+  const effectMapStr = effectMapEntries.join(',\n');
 
-  return { files, tickValues };
-}
-
-// 生成火焰附加脚本（事件驱动，无闪烁问题，保留脚本方案）
-function generateFireAspectScript(fireAspectEntries: FireAspectEntry[]): string {
-  if (fireAspectEntries.length === 0) return '';
-
+  // 火焰附加 MAP
   const fireAspectMap = fireAspectEntries.map(e =>
     `  "${e.itemId}": ${e.seconds}`
   ).join(',\n');
 
-  return `// 火焰附加脚本 — 由 Make Addons 生成
-// 攻击生物时使其着火（事件驱动，无闪烁）
-import { world, system, EquipmentSlot } from "@minecraft/server";
+  const hasContinuous = continuousEntries.length > 0;
+  const hasFireAspect = fireAspectEntries.length > 0;
 
-const FIRE_ASPECT_MAP = {
-${fireAspectMap}
-};
+  // 构建脚本各部分
+  const parts: string[] = [
+    '// 效果管理脚本 — 由 Make Addons 生成',
+    '// 持续药水效果：装备/武器上的药水效果在手持或穿戴时持续生效',
+    '// 火焰附加：攻击生物时使其着火',
+    'import { world, system, EquipmentSlot } from "@minecraft/server";',
+    '',
+  ];
 
-world.afterEvents.entityHurt.subscribe((event) => {
-  try {
-    const attacker = event.damageSource.damagingEntity;
-    const victim = event.hurtEntity;
-    if (!attacker || !victim) return;
+  if (hasContinuous) {
+    parts.push(
+      'const EFFECT_MAP = {',
+      effectMapStr,
+      '};',
+      '',
+      '// 每 20 tick (1秒) 检查一次',
+      'system.runInterval(() => {',
+      '  for (const player of world.getAllPlayers()) {',
+      '    try {',
+      '      // 检查主手武器',
+      '      const equippable = player.getComponent("minecraft:equippable");',
+      '      if (equippable) {',
+      '        const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();',
+      '        if (mainHand && EFFECT_MAP[mainHand.typeId]) {',
+      '          applyEffects(player, EFFECT_MAP[mainHand.typeId]);',
+      '        }',
+      '        // 检查装备栏 (头盔/胸甲/护腿/靴子)',
+      '        for (const slot of [EquipmentSlot.Head, EquipmentSlot.Chest, EquipmentSlot.Legs, EquipmentSlot.Feet]) {',
+      '          try {',
+      '            const item = equippable.getEquipmentSlot(slot).getItem();',
+      '            if (item && EFFECT_MAP[item.typeId]) {',
+      '              applyEffects(player, EFFECT_MAP[item.typeId]);',
+      '            }',
+      '          } catch {}',
+      '        }',
+      '      }',
+      '    } catch {}',
+      '  }',
+      '}, 20);',
+      '',
+      'function applyEffects(player, effects) {',
+      '  for (const [effectId, opts] of Object.entries(effects)) {',
+      '    try {',
+      '      player.addEffect(effectId, opts.duration, { amplifier: opts.amplifier, showParticles: opts.showParticles });',
+      '    } catch {}',
+      '  }',
+      '}',
+      '',
+    );
+  }
 
-    const equippable = attacker.getComponent("minecraft:equippable");
-    if (!equippable) return;
-    const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();
-    if (!mainHand) return;
+  if (hasFireAspect) {
+    parts.push(
+      'const FIRE_ASPECT_MAP = {',
+      fireAspectMap,
+      '};',
+      '',
+      '// 监听实体受伤事件 — 攻击者手持火焰附加武器时点燃被攻击者',
+      'world.afterEvents.entityHurt.subscribe((event) => {',
+      '  try {',
+      '    const attacker = event.damageSource.damagingEntity;',
+      '    const victim = event.hurtEntity;',
+      '    if (!attacker || !victim) return;',
+      '',
+      '    const equippable = attacker.getComponent("minecraft:equippable");',
+      '    if (!equippable) return;',
+      '    const mainHand = equippable.getEquipmentSlot(EquipmentSlot.Mainhand).getItem();',
+      '    if (!mainHand) return;',
+      '',
+      '    const seconds = FIRE_ASPECT_MAP[mainHand.typeId];',
+      '    if (seconds) {',
+      '      victim.setOnFire(seconds);',
+      '    }',
+      '  } catch {}',
+      '});',
+      '',
+    );
+  }
 
-    const seconds = FIRE_ASPECT_MAP[mainHand.typeId];
-    if (seconds) {
-      victim.setOnFire(seconds);
-    }
-  } catch {}
-});
-`;
+  return parts.join('\n');
 }
 
 // 生成合成配方 JSON
@@ -460,10 +501,10 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     }
   }
 
-  // 检查是否需要脚本模块（火焰附加需要事件监听脚本；持续药水效果改用 mcfunction）
+  // 检查是否需要脚本模块（火焰附加 + 持续药水效果都需要脚本 API）
   const continuousEffects = collectContinuousEffects(allItems);
   const fireAspectItems = collectFireAspectItems(allItems);
-  const hasScript = fireAspectItems.length > 0 || allItems.some(({ module }) => module.id === 'script');
+  const hasScript = fireAspectItems.length > 0 || continuousEffects.length > 0 || allItems.some(({ module }) => module.id === 'script');
 
   // 行为包 manifest
   files.push({
@@ -631,18 +672,11 @@ export function generateAddonFiles(project: Project, modules: ModuleDefinition[]
     });
   }
 
-  // 持续药水效果 — 生成 .mcfunction 文件 + tick.json（每 tick 执行，无缝刷新）
-  if (continuousEffects.length > 0) {
-    const { files: mcfnFiles, tickValues: effectTickValues } = generateEffectMcfunctions(continuousEffects);
-    files.push(...mcfnFiles);
-    tickValues.push(...effectTickValues);
-  }
-
-  // 火焰附加脚本（事件驱动，无闪烁问题）
-  if (fireAspectItems.length > 0) {
+  // 效果管理脚本（持续药水效果 + 火焰附加，统一脚本方案）
+  if (continuousEffects.length > 0 || fireAspectItems.length > 0) {
     files.push({
       path: 'behavior_pack/scripts/effect_manager.js',
-      content: generateFireAspectScript(fireAspectItems),
+      content: generateEffectScript(continuousEffects, fireAspectItems),
     });
   }
 
