@@ -81,9 +81,9 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     // 特殊字段处理
     if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup') continue;
 
-    // rarity 使用裸字符串格式（与 MAM 一致）
+    // rarity 使用 {value: "..."} 格式（与 MAM 一致）
     if (field.key === 'rarity') {
-      components['minecraft:rarity'] = value;
+      components['minecraft:rarity'] = { value };
       continue;
     }
 
@@ -94,9 +94,9 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
     }
   }
 
-  // fireResistant 使用空对象格式（与 MAM 一致）
+  // fireResistant 使用 {value: true} 格式（与 MAM 一致）
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   // --- 特殊组件处理 ---
@@ -307,20 +307,7 @@ function generateItem(module: ModuleDefinition, item: ProjectItem): Record<strin
 
   // 耐火
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
-  }
-
-  // minecraft:tags — 与 MAM 参考实现一致
-  // 药水效果/火焰附加标记标签，用于标识物品具有持续效果
-  const effectTags: string[] = [];
-  if (data.potionEffectsEnable && data.potionEffects?.length > 0) {
-    effectTags.push('pa:has_continuous_effects');
-  }
-  if (data.fireAspectEnable) {
-    effectTags.push('pa:fire_aspect');
-  }
-  if (effectTags.length > 0) {
-    components['minecraft:tags'] = { tags: effectTags };
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   // 标签
@@ -888,9 +875,9 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
 
     if (field.key === 'identifier' || field.key === 'displayName' || field.key === 'menuCategory' || field.key === 'itemGroup' || field.key === 'normalType') continue;
 
-    // rarity 使用裸字符串格式（与 MAM 一致）
+    // rarity 使用 {value: "..."} 格式（与 MAM 一致）
     if (field.key === 'rarity') {
-      components['minecraft:rarity'] = value;
+      components['minecraft:rarity'] = { value };
       continue;
     }
 
@@ -925,7 +912,7 @@ function generateNormal(module: ModuleDefinition, item: ProjectItem): Record<str
 
   // --- 耐火 ---
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   // --- 标签 ---
@@ -1130,11 +1117,11 @@ function generateCustomItem(module: ModuleDefinition, item: ProjectItem): Record
   }
 
   if (data.rarity) {
-    components['minecraft:rarity'] = data.rarity;
+    components['minecraft:rarity'] = { value: data.rarity };
   }
 
   if (data.fireResistant) {
-    components['minecraft:fire_resistant'] = {};
+    components['minecraft:fire_resistant'] = { value: true };
   }
 
   if (data.tags?.length) {
